@@ -12,6 +12,14 @@ obj-$(CONFIG_MSM_CLK_CONTROLLER_V2)	+= msm-clock-controller.o
 
 obj-$(CONFIG_COMMON_CLK_MSM)	+= clock-debug.o
 
+# MSM 8916
+ifeq ($(CONFIG_COMMON_CLK_MSM), y)
+	obj-$(CONFIG_ARCH_MSM8916) += clock-gcc-8916.o
+	obj-$(CONFIG_ARCH_MSM8916) += clock-rpm-8916.o
+	obj-$(CONFIG_ARCH_MSM8916) += clock-a7.o
+	obj-$(CONFIG_ARCH_MSM8916) += clock-rcgwr.o
+endif
+
 # MSM 8996
 ifeq ($(CONFIG_COMMON_CLK_MSM), y)
 	obj-$(CONFIG_ARCH_MSM8996) += clock-gcc-8996.o

@@ -1,5 +1,7 @@
 menu "SOC (System On Chip) specific Drivers"
 
+source "drivers/soc/oppo/Kconfig"
+
 source "drivers/soc/brcmstb/Kconfig"
 source "drivers/soc/mediatek/Kconfig"
 source "drivers/soc/qcom/Kconfig"

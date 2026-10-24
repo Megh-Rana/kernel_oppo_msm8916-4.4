@@ -388,6 +388,9 @@ kgsl_mmu_map(struct kgsl_pagetable *pagetable,
 {
 	int size;
 
+	if (!pagetable)
+		return -EINVAL;
+
 	if (!memdesc->gpuaddr)
 		return -EINVAL;
 	if (!(memdesc->flags & (KGSL_MEMFLAGS_SPARSE_VIRT |
@@ -473,6 +476,9 @@ kgsl_mmu_unmap(struct kgsl_pagetable *pagetable,
 		struct kgsl_memdesc *memdesc)
 {
 	int ret = 0;
+
+	if (!pagetable)
+		return -EINVAL;
 
 	if (memdesc->size == 0)
 		return -EINVAL;

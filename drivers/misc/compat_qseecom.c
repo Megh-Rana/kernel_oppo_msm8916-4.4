@@ -69,6 +69,30 @@ static int compat_get_qseecom_load_img_req(
 	return err;
 }
 
+static int compat_get_qseecom_load_img_req_32(
+		struct compat_qseecom_load_img_req_32 __user *data32,
+		struct qseecom_load_img_req __user *data)
+{
+	int err;
+	compat_ulong_t mdt_len;
+	compat_ulong_t img_len;
+	compat_long_t ifd_data_fd;
+	compat_uint_t app_id;
+
+	err = get_user(mdt_len, &data32->mdt_len);
+	err |= put_user(mdt_len, &data->mdt_len);
+	err |= get_user(img_len, &data32->img_len);
+	err |= put_user(img_len, &data->img_len);
+	err |= get_user(ifd_data_fd, &data32->ifd_data_fd);
+	err |= put_user(ifd_data_fd, &data->ifd_data_fd);
+	err |= copy_in_user(data->img_name, data32->img_name, 32);
+	err |= clear_user(data->img_name + 32, MAX_APP_NAME_SIZE - 32);
+	err |= put_user(0, &data->app_arch);
+	err |= get_user(app_id, &data32->app_id);
+	err |= put_user(app_id, &data->app_id);
+	return err;
+}
+
 static int compat_get_qseecom_send_cmd_req(
 		struct compat_qseecom_send_cmd_req __user *data32,
 		struct qseecom_send_cmd_req __user *data)
@@ -176,6 +200,21 @@ static int compat_get_qseecom_qseos_app_load_query(
 	err |= put_user(app_id, &data->app_id);
 	err |= get_user(app_arch, &data32->app_arch);
 	err |= put_user(app_arch, &data->app_arch);
+	return err;
+}
+
+static int compat_get_qseecom_qseos_app_load_query_32(
+		struct compat_qseecom_qseos_app_load_query_32 __user *data32,
+		struct qseecom_qseos_app_load_query __user *data)
+{
+	int err = 0;
+	compat_uint_t app_id;
+
+	err |= copy_in_user(data->app_name, data32->app_name, 32);
+	err |= clear_user(data->app_name + 32, MAX_APP_NAME_SIZE - 32);
+	err |= get_user(app_id, &data32->app_id);
+	err |= put_user(app_id, &data->app_id);
+	err |= put_user(0, &data->app_arch);
 	return err;
 }
 
@@ -430,6 +469,28 @@ static int compat_put_qseecom_load_img_req(
 	return err;
 }
 
+static int compat_put_qseecom_load_img_req_32(
+		struct compat_qseecom_load_img_req_32 __user *data32,
+		struct qseecom_load_img_req __user *data)
+{
+	int err;
+	compat_ulong_t mdt_len;
+	compat_ulong_t img_len;
+	compat_long_t ifd_data_fd;
+	compat_int_t app_id;
+
+	err = get_user(mdt_len, &data->mdt_len);
+	err |= put_user(mdt_len, &data32->mdt_len);
+	err |= get_user(img_len, &data->img_len);
+	err |= put_user(img_len, &data32->img_len);
+	err |= get_user(ifd_data_fd, &data->ifd_data_fd);
+	err |= put_user(ifd_data_fd, &data32->ifd_data_fd);
+	err |= copy_in_user(data32->img_name, data->img_name, 32);
+	err |= get_user(app_id, &data->app_id);
+	err |= put_user(app_id, &data32->app_id);
+	return err;
+}
+
 static int compat_put_qseecom_qseos_version_req(
 		struct compat_qseecom_qseos_version_req __user *data32,
 		struct qseecom_qseos_version_req __user *data)
@@ -464,6 +525,19 @@ static int compat_put_qseecom_qseos_app_load_query(
 	return err;
 }
 
+static int compat_put_qseecom_qseos_app_load_query_32(
+		struct compat_qseecom_qseos_app_load_query_32 __user *data32,
+		struct qseecom_qseos_app_load_query __user *data)
+{
+	int err = 0;
+	compat_int_t app_id;
+
+	err |= copy_in_user(data32->app_name, data->app_name, 32);
+	err |= get_user(app_id, &data->app_id);
+	err |= put_user(app_id, &data32->app_id);
+	return err;
+}
+
 static int compat_put_qseecom_is_es_activated_req(
 		struct compat_qseecom_is_es_activated_req __user *data32,
 		struct qseecom_is_es_activated_req __user *data)
@@ -484,6 +558,7 @@ static unsigned int convert_cmd(unsigned int cmd)
 	case COMPAT_QSEECOM_IOCTL_UNREGISTER_LISTENER_REQ:
 		return QSEECOM_IOCTL_UNREGISTER_LISTENER_REQ;
 	case COMPAT_QSEECOM_IOCTL_LOAD_APP_REQ:
+	case COMPAT_QSEECOM_IOCTL_LOAD_APP_REQ_32:
 		return QSEECOM_IOCTL_LOAD_APP_REQ;
 	case COMPAT_QSEECOM_IOCTL_RECEIVE_REQ:
 		return QSEECOM_IOCTL_RECEIVE_REQ;
@@ -508,8 +583,10 @@ static unsigned int convert_cmd(unsigned int cmd)
 	case COMPAT_QSEECOM_IOCTL_GET_QSEOS_VERSION_REQ:
 		return QSEECOM_IOCTL_GET_QSEOS_VERSION_REQ;
 	case COMPAT_QSEECOM_IOCTL_LOAD_EXTERNAL_ELF_REQ:
+	case COMPAT_QSEECOM_IOCTL_LOAD_EXTERNAL_ELF_REQ_32:
 		return QSEECOM_IOCTL_LOAD_EXTERNAL_ELF_REQ;
 	case COMPAT_QSEECOM_IOCTL_APP_LOADED_QUERY_REQ:
+	case COMPAT_QSEECOM_IOCTL_APP_LOADED_QUERY_REQ_32:
 		return QSEECOM_IOCTL_APP_LOADED_QUERY_REQ;
 	case COMPAT_QSEECOM_IOCTL_SEND_CMD_SERVICE_REQ:
 		return QSEECOM_IOCTL_SEND_CMD_SERVICE_REQ;
@@ -596,6 +673,27 @@ long compat_qseecom_ioctl(struct file *file,
 		ret = qseecom_ioctl(file, convert_cmd(cmd),
 						(unsigned long)data);
 		err = compat_put_qseecom_load_img_req(data32, data);
+		return ret ? ret : err;
+	}
+	break;
+	case COMPAT_QSEECOM_IOCTL_LOAD_APP_REQ_32:
+	case COMPAT_QSEECOM_IOCTL_LOAD_EXTERNAL_ELF_REQ_32: {
+		struct compat_qseecom_load_img_req_32 __user *data32;
+		struct qseecom_load_img_req __user *data;
+		int err;
+
+		data32 = compat_ptr(arg);
+		data = compat_alloc_user_space(sizeof(*data));
+		if (data == NULL)
+			return -EFAULT;
+
+		err = compat_get_qseecom_load_img_req_32(data32, data);
+		if (err)
+			return err;
+
+		ret = qseecom_ioctl(file, convert_cmd(cmd),
+						(unsigned long)data);
+		err = compat_put_qseecom_load_img_req_32(data32, data);
 		return ret ? ret : err;
 	}
 	break;
@@ -726,6 +824,26 @@ long compat_qseecom_ioctl(struct file *file,
 		ret = qseecom_ioctl(file, convert_cmd(cmd),
 					(unsigned long)data);
 		err = compat_put_qseecom_qseos_app_load_query(data32, data);
+		return ret ? ret : err;
+	}
+	break;
+	case COMPAT_QSEECOM_IOCTL_APP_LOADED_QUERY_REQ_32: {
+		struct compat_qseecom_qseos_app_load_query_32 __user *data32;
+		struct qseecom_qseos_app_load_query __user *data;
+		int err;
+
+		data32 = compat_ptr(arg);
+		data = compat_alloc_user_space(sizeof(*data));
+		if (data == NULL)
+			return -EFAULT;
+
+		err = compat_get_qseecom_qseos_app_load_query_32(data32, data);
+		if (err)
+			return err;
+
+		ret = qseecom_ioctl(file, convert_cmd(cmd),
+					(unsigned long)data);
+		err = compat_put_qseecom_qseos_app_load_query_32(data32, data);
 		return ret ? ret : err;
 	}
 	break;

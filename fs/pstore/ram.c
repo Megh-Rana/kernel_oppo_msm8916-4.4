@@ -541,6 +541,26 @@ static int ramoops_parse_dt(struct platform_device *pdev,
 
 	dev_dbg(&pdev->dev, "using Device Tree\n");
 
+	{
+		u32 val;
+		if (!of_property_read_u32(of_node, "android,ramoops-buffer-start", &val)) {
+			pdata->mem_address = val;
+			if (!of_property_read_u32(of_node, "android,ramoops-buffer-size", &val))
+				pdata->mem_size = val;
+			if (!of_property_read_u32(of_node, "android,ramoops-console-size", &val))
+				pdata->console_size = val;
+			if (!of_property_read_u32(of_node, "android,ramoops-pmsg-size", &val))
+				pdata->pmsg_size = val;
+			if (!of_property_read_u32(of_node, "android,ramoops-record-size", &val))
+				pdata->record_size = val;
+			if (!of_property_read_u32(of_node, "android,ramoops-dump-oops", &val))
+				pdata->dump_oops = val;
+			if (!of_property_read_u32(of_node, "android,ramoops-ftrace-size", &val))
+				pdata->ftrace_size = val;
+			return 0;
+		}
+	}
+
 	mem_region = of_parse_phandle(of_node, "memory-region", 0);
 	if (!mem_region) {
 		dev_err(&pdev->dev, "no memory-region phandle\n");

@@ -121,6 +121,22 @@ struct compat_qseecom_qseos_app_load_query {
 	compat_ulong_t app_arch;
 };
 
+/*
+ * Legacy 3.10 compat structures where MAX_APP_NAME_SIZE was 32
+ */
+struct compat_qseecom_qseos_app_load_query_32 {
+	char app_name[32]; /* in */
+	compat_uint_t app_id; /* out */
+};
+
+struct compat_qseecom_load_img_req_32 {
+	compat_ulong_t mdt_len; /* in */
+	compat_ulong_t img_len; /* in */
+	compat_long_t  ifd_data_fd; /* in */
+	char	 img_name[32]; /* in */
+	compat_uint_t app_id; /* out*/
+};
+
 struct compat_qseecom_send_svc_cmd_req {
 	compat_ulong_t cmd_id;
 	compat_uptr_t cmd_req_buf; /* in */
@@ -247,6 +263,9 @@ extern long compat_qseecom_ioctl(struct file *file,
 #define COMPAT_QSEECOM_IOCTL_LOAD_APP_REQ \
 	_IOWR(QSEECOM_IOC_MAGIC, 7, struct compat_qseecom_load_img_req)
 
+#define COMPAT_QSEECOM_IOCTL_LOAD_APP_REQ_32 \
+	_IOWR(QSEECOM_IOC_MAGIC, 7, struct compat_qseecom_load_img_req_32)
+
 #define COMPAT_QSEECOM_IOCTL_SET_MEM_PARAM_REQ \
 	_IOWR(QSEECOM_IOC_MAGIC, 8, struct compat_qseecom_set_sb_mem_param_req)
 
@@ -265,11 +284,17 @@ extern long compat_qseecom_ioctl(struct file *file,
 #define COMPAT_QSEECOM_IOCTL_LOAD_EXTERNAL_ELF_REQ \
 	_IOWR(QSEECOM_IOC_MAGIC, 13, struct compat_qseecom_load_img_req)
 
+#define COMPAT_QSEECOM_IOCTL_LOAD_EXTERNAL_ELF_REQ_32 \
+	_IOWR(QSEECOM_IOC_MAGIC, 13, struct compat_qseecom_load_img_req_32)
+
 #define COMPAT_QSEECOM_IOCTL_UNLOAD_EXTERNAL_ELF_REQ \
 	_IO(QSEECOM_IOC_MAGIC, 14)
 
 #define COMPAT_QSEECOM_IOCTL_APP_LOADED_QUERY_REQ \
 	_IOWR(QSEECOM_IOC_MAGIC, 15, struct compat_qseecom_qseos_app_load_query)
+
+#define COMPAT_QSEECOM_IOCTL_APP_LOADED_QUERY_REQ_32 \
+	_IOWR(QSEECOM_IOC_MAGIC, 15, struct compat_qseecom_qseos_app_load_query_32)
 
 #define COMPAT_QSEECOM_IOCTL_SEND_CMD_SERVICE_REQ \
 	_IOWR(QSEECOM_IOC_MAGIC, 16, struct compat_qseecom_send_svc_cmd_req)

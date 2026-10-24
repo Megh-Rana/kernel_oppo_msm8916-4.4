@@ -1226,3 +1226,4 @@ config TOUCHSCREEN_ST
 source "drivers/input/touchscreen/st/Kconfig"
 
 endif
+source "drivers/input/touchscreen/synaptics_oppo/Kconfig"

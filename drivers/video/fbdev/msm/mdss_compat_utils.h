@@ -433,6 +433,18 @@ struct mdp_sharp_cfg32 {
 	uint32_t noise_thr;
 };
 
+struct mdp_overlay_pp_params_v1_32 {
+	uint32_t config_ops;
+	struct mdp_csc_cfg32 csc_cfg;
+	struct mdp_qseed_cfg32 qseed_cfg[2];
+	struct mdp_pa_cfg32 pa_cfg;
+	struct mdp_pa_v2_data32 pa_v2_cfg;
+	struct mdp_igc_lut_data32 igc_cfg;
+	struct mdp_sharp_cfg32 sharp_cfg;
+	struct mdp_histogram_cfg32 hist_cfg;
+	struct mdp_hist_lut_data32 hist_lut_cfg;
+};
+
 struct mdp_overlay_pp_params32 {
 	uint32_t config_ops;
 	struct mdp_csc_cfg32 csc_cfg;
@@ -485,7 +497,7 @@ struct mdp_overlay32 {
 	uint32_t bg_color;
 	uint8_t horz_deci;
 	uint8_t vert_deci;
-	struct mdp_overlay_pp_params32 overlay_pp_cfg;
+	struct mdp_overlay_pp_params_v1_32 overlay_pp_cfg;
 	struct mdp_scale_data scale;
 	uint8_t color_space;
 	uint32_t frame_rate;

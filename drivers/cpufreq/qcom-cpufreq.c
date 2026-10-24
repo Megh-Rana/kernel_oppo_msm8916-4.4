@@ -374,7 +374,7 @@ static struct cpufreq_frequency_table *cpufreq_parse_dt(struct device *dev,
 	return ftbl;
 }
 
-static int __init msm_cpufreq_probe(struct platform_device *pdev)
+static int msm_cpufreq_probe(struct platform_device *pdev)
 {
 	struct device *dev = &pdev->dev;
 	char clk_name[] = "cpu??_clk";
@@ -382,6 +382,7 @@ static int __init msm_cpufreq_probe(struct platform_device *pdev)
 	struct clk *c;
 	int cpu;
 	struct cpufreq_frequency_table *ftbl;
+	int rc;
 
 	l2_clk = devm_clk_get(dev, "l2_clk");
 	if (IS_ERR(l2_clk))
@@ -407,7 +408,7 @@ static int __init msm_cpufreq_probe(struct platform_device *pdev)
 	if (!IS_ERR(ftbl)) {
 		for_each_possible_cpu(cpu)
 			per_cpu(freq_table, cpu) = ftbl;
-		return 0;
+		goto register_driver;
 	}
 
 	/*
@@ -447,6 +448,14 @@ static int __init msm_cpufreq_probe(struct platform_device *pdev)
 		per_cpu(freq_table, cpu) = ftbl;
 	}
 
+register_driver:
+	register_pm_notifier(&msm_cpufreq_pm_notifier);
+	rc = cpufreq_register_driver(&msm_cpufreq_driver);
+	if (rc) {
+		dev_err(dev, "failed to register cpufreq driver: %d\n", rc);
+		return rc;
+	}
+	dev_info(dev, "msm-cpufreq driver registered successfully\n");
 	return 0;
 }
 
@@ -456,6 +465,7 @@ static struct of_device_id match_table[] = {
 };
 
 static struct platform_driver msm_cpufreq_plat_driver = {
+	.probe = msm_cpufreq_probe,
 	.driver = {
 		.name = "msm-cpufreq",
 		.of_match_table = match_table,
@@ -465,26 +475,14 @@ static struct platform_driver msm_cpufreq_plat_driver = {
 
 static int __init msm_cpufreq_register(void)
 {
-	int cpu, rc;
+	int cpu;
 
 	for_each_possible_cpu(cpu) {
 		mutex_init(&(per_cpu(suspend_data, cpu).suspend_mutex));
 		per_cpu(suspend_data, cpu).device_suspended = 0;
 	}
 
-	rc = platform_driver_probe(&msm_cpufreq_plat_driver,
-				   msm_cpufreq_probe);
-	if (rc < 0) {
-		/* Unblock hotplug if msm-cpufreq probe fails */
-		unregister_hotcpu_notifier(&msm_cpufreq_cpu_notifier);
-		for_each_possible_cpu(cpu)
-			mutex_destroy(&(per_cpu(suspend_data, cpu).
-					suspend_mutex));
-		return rc;
-	}
-
-	register_pm_notifier(&msm_cpufreq_pm_notifier);
-	return cpufreq_register_driver(&msm_cpufreq_driver);
+	return platform_driver_register(&msm_cpufreq_plat_driver);
 }
 
 subsys_initcall(msm_cpufreq_register);

@@ -154,9 +154,25 @@ module_param_named(
 	print_parsed_dt, print_parsed_dt, bool, S_IRUGO | S_IWUSR | S_IWGRP
 );
 
-static bool sleep_disabled;
-module_param_named(sleep_disabled,
-	sleep_disabled, bool, S_IRUGO | S_IWUSR | S_IWGRP);
+static bool sleep_disabled = 1;
+static int set_sleep_disabled(const char *val, const struct kernel_param *kp)
+{
+	bool n;
+	int ret = strtobool(val, &n);
+	if (ret)
+		return ret;
+	if (!n) {
+		pr_info("lpm_levels: ignoring userspace request to clear sleep_disabled (forcing sleep_disabled=1 for stability)\n");
+		return 0;
+	}
+	sleep_disabled = n;
+	return 0;
+}
+static const struct kernel_param_ops sleep_disabled_ops = {
+	.set = set_sleep_disabled,
+	.get = param_get_bool,
+};
+module_param_cb(sleep_disabled, &sleep_disabled_ops, &sleep_disabled, S_IRUGO | S_IWUSR | S_IWGRP);
 
 s32 msm_cpuidle_get_deep_idle_latency(void)
 {

@@ -639,6 +639,9 @@ config SND_SOC_STA350
 	tristate "STA350 speaker amplifier"
 	depends on I2C
 
+config SND_SOC_MSM8X16_WCD
+	tristate
+
 config SND_SOC_STA529
 	tristate
 

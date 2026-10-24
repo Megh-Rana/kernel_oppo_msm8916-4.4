@@ -3179,7 +3179,7 @@ pp_compat_exit:
 	return ret;
 }
 
-static int __from_user_pp_params(struct mdp_overlay_pp_params32 *ppp32,
+static int __from_user_pp_params(struct mdp_overlay_pp_params_v1_32 *ppp32,
 				struct mdp_overlay_pp_params *ppp)
 {
 	int ret = 0;
@@ -3237,7 +3237,7 @@ static int __from_user_pp_params(struct mdp_overlay_pp_params32 *ppp32,
 }
 
 static int __to_user_pp_params(struct mdp_overlay_pp_params *ppp,
-				struct mdp_overlay_pp_params32 *ppp32)
+				struct mdp_overlay_pp_params_v1_32 *ppp32)
 {
 	int ret = 0;
 

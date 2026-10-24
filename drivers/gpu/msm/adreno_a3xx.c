@@ -1606,8 +1606,8 @@ int a3xx_microcode_read(struct adreno_device *adreno_dev)
 			adreno_dev->gpucore->pm4fw_name, &ptr, &len);
 
 		if (ret) {
-			KGSL_DRV_FATAL(device, "Failed to read pm4 ucode %s\n",
-					   adreno_dev->gpucore->pm4fw_name);
+			KGSL_DRV_ERR(device, "Failed to read pm4 ucode %s: %d\n",
+					   adreno_dev->gpucore->pm4fw_name, ret);
 			return ret;
 		}
 
@@ -1631,8 +1631,8 @@ int a3xx_microcode_read(struct adreno_device *adreno_dev)
 		int ret = _load_firmware(device,
 			adreno_dev->gpucore->pfpfw_name, &ptr, &len);
 		if (ret) {
-			KGSL_DRV_FATAL(device, "Failed to read pfp ucode %s\n",
-					   adreno_dev->gpucore->pfpfw_name);
+			KGSL_DRV_ERR(device, "Failed to read pfp ucode %s: %d\n",
+					   adreno_dev->gpucore->pfpfw_name, ret);
 			return ret;
 		}
 

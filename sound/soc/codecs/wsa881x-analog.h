@@ -39,6 +39,7 @@ enum {
 extern const u8 wsa881x_ana_reg_readable[WSA881X_CACHE_SIZE];
 extern struct reg_default wsa881x_ana_reg_defaults[WSA881X_CACHE_SIZE];
 extern struct regmap_config wsa881x_ana_regmap_config[2];
+#if IS_ENABLED(CONFIG_SND_SOC_WSA881X_ANALOG)
 int wsa881x_get_client_index(void);
 int wsa881x_get_probing_count(void);
 int wsa881x_get_presence_count(void);
@@ -46,5 +47,14 @@ int wsa881x_set_mclk_callback(
 	int (*enable_mclk_callback)(struct snd_soc_card *, bool));
 void wsa881x_update_reg_defaults_2_0(void);
 void wsa881x_update_regmap_2_0(struct regmap *regmap, int flag);
+#else
+static inline int wsa881x_get_client_index(void) { return 0; }
+static inline int wsa881x_get_probing_count(void) { return 0; }
+static inline int wsa881x_get_presence_count(void) { return 0; }
+static inline int wsa881x_set_mclk_callback(
+	int (*enable_mclk_callback)(struct snd_soc_card *, bool)) { return 0; }
+static inline void wsa881x_update_reg_defaults_2_0(void) {}
+static inline void wsa881x_update_regmap_2_0(struct regmap *regmap, int flag) {}
+#endif
 
 #endif /* _WSA881X_H */

@@ -686,6 +686,7 @@ static long bt_ioctl(struct file *file, unsigned int cmd, unsigned long arg)
 
 	switch (cmd) {
 	case BT_CMD_SLIM_TEST:
+#if IS_ENABLED(CONFIG_BTFM_SLIM)
 		if (!bt_power_pdata->slim_dev) {
 			BT_PWR_ERR("slim_dev is null\n");
 			return -EINVAL;
@@ -693,6 +694,9 @@ static long bt_ioctl(struct file *file, unsigned int cmd, unsigned long arg)
 		ret = btfm_slim_hw_init(
 			bt_power_pdata->slim_dev->platform_data
 		);
+#else
+		ret = -ENODEV;
+#endif
 		break;
 	case BT_CMD_PWR_CTRL:
 		pwr_cntrl = (int)arg;

@@ -57,6 +57,8 @@
 #define SYN_CONFIG		1
 #define SYN_MT_REPORT		2
 #define SYN_DROPPED		3
+#define SYN_TIME_SEC		4
+#define SYN_TIME_NSEC		5
 #define SYN_MAX			0xf
 #define SYN_CNT			(SYN_MAX+1)
 
@@ -335,6 +337,19 @@
 #define KEY_RFKILL		247	/* Key that controls all radios */
 
 #define KEY_MICMUTE		248	/* Mute / unmute the microphone */
+
+#define KEY_GESTURE_CIRCLE		250
+#define KEY_GESTURE_DOUBLE_SWIPE	251
+#define KEY_GESTURE_DOWN_ARROW		252
+#define KEY_GESTURE_LEFT_ARROW		253
+#define KEY_GESTURE_RIGHT_ARROW		254
+#define KEY_GESTURE_UP_ARROW		255
+#define KEY_GESTURE_SWIPE_RIGHT		256
+#define KEY_GESTURE_SWIPE_LEFT		257
+#define KEY_GESTURE_SWIPE_DOWN		258
+#define KEY_GESTURE_SWIPE_UP		259
+#define KEY_GESTURE_W			260
+#define KEY_GESTURE_M			261
 
 /* Code 255 is reserved for special needs of AT keyboard driver */
 

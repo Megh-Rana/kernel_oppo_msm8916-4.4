@@ -988,7 +988,49 @@ int mdss_mdp_overlay_pipe_setup(struct msm_fb_data_type *mfd,
 		}
 	}
 
-	memcpy(&pipe->scaler, &req->scale, sizeof(struct mdp_scale_data));
+	memset(&pipe->scaler, 0, sizeof(pipe->scaler));
+	if (req->scale.enable_pxl_ext &&
+	    req->scale.roi_w[0] > 0 && req->scale.roi_w[0] <= pipe->src.w) {
+		pipe->scaler.enable = req->scale.enable_pxl_ext;
+		memcpy(pipe->scaler.init_phase_x, req->scale.init_phase_x,
+			sizeof(req->scale.init_phase_x));
+		memcpy(pipe->scaler.phase_step_x, req->scale.phase_step_x,
+			sizeof(req->scale.phase_step_x));
+		memcpy(pipe->scaler.init_phase_y, req->scale.init_phase_y,
+			sizeof(req->scale.init_phase_y));
+		memcpy(pipe->scaler.phase_step_y, req->scale.phase_step_y,
+			sizeof(req->scale.phase_step_y));
+
+		memcpy(pipe->scaler.num_ext_pxls_left, req->scale.num_ext_pxls_left,
+			sizeof(req->scale.num_ext_pxls_left));
+		memcpy(pipe->scaler.num_ext_pxls_right, req->scale.num_ext_pxls_right,
+			sizeof(req->scale.num_ext_pxls_right));
+		memcpy(pipe->scaler.num_ext_pxls_top, req->scale.num_ext_pxls_top,
+			sizeof(req->scale.num_ext_pxls_top));
+		memcpy(pipe->scaler.num_ext_pxls_btm, req->scale.num_ext_pxls_btm,
+			sizeof(req->scale.num_ext_pxls_btm));
+
+		memcpy(pipe->scaler.left_ftch, req->scale.left_ftch,
+			sizeof(req->scale.left_ftch));
+		memcpy(pipe->scaler.left_rpt, req->scale.left_rpt,
+			sizeof(req->scale.left_rpt));
+		memcpy(pipe->scaler.right_ftch, req->scale.right_ftch,
+			sizeof(req->scale.right_ftch));
+		memcpy(pipe->scaler.right_rpt, req->scale.right_rpt,
+			sizeof(req->scale.right_rpt));
+
+		memcpy(pipe->scaler.top_rpt, req->scale.top_rpt,
+			sizeof(req->scale.top_rpt));
+		memcpy(pipe->scaler.btm_rpt, req->scale.btm_rpt,
+			sizeof(req->scale.btm_rpt));
+		memcpy(pipe->scaler.top_ftch, req->scale.top_ftch,
+			sizeof(req->scale.top_ftch));
+		memcpy(pipe->scaler.btm_ftch, req->scale.btm_ftch,
+			sizeof(req->scale.btm_ftch));
+
+		memcpy(pipe->scaler.roi_w, req->scale.roi_w,
+			sizeof(req->scale.roi_w));
+	}
 	pipe->src_fmt = fmt;
 	mdss_mdp_overlay_set_chroma_sample(pipe);
 

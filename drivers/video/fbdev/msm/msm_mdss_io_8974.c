@@ -591,6 +591,9 @@ static void mdss_dsi_phy_regulator_disable(struct mdss_dsi_ctrl_pdata *ctrl)
 	if (ctrl->shared_data->phy_rev == DSI_PHY_REV_30)
 		return;
 
+	if (!ctrl->phy_regulator_io.base)
+		return;
+
 	MIPI_OUTP(ctrl->phy_regulator_io.base + 0x018, 0x000);
 }
 
@@ -648,6 +651,9 @@ static void mdss_dsi_28nm_phy_regulator_enable(
 		pr_warn("%s: invalid regulator settings\n", __func__);
 		return;
 	}
+
+	if (!ctrl_pdata->phy_regulator_io.base)
+		return;
 
 	if (pd->reg_ldo_mode) {
 		/* Regulator ctrl 0 */

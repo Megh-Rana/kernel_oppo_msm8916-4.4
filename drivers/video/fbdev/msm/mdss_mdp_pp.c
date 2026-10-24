@@ -2293,6 +2293,12 @@ static void pp_dither_config(char __iomem *addr,
 	u32 data;
 	int i;
 
+	if (!addr || !pp_sts || !dither_cfg) {
+		pr_err("%s: invalid null pointer: addr=%p, pp_sts=%p, dither_cfg=%p\n",
+			__func__, addr, pp_sts, dither_cfg);
+		return;
+	}
+
 	if (dither_cfg->flags & MDP_PP_OPS_WRITE) {
 		data = dither_depth_map[dither_cfg->g_y_depth];
 		data |= dither_depth_map[dither_cfg->b_cb_depth] << 2;
@@ -2549,11 +2555,11 @@ static int pp_dspp_setup(u32 disp_num, struct mdss_mdp_mixer *mixer,
 
 	if ((flags & PP_FLAGS_DIRTY_DITHER) &&
 		(pp_program_mask & PP_PROGRAM_DITHER)) {
-		if (!pp_ops[DITHER].pp_set_config && addr) {
+		addr = base + MDSS_MDP_REG_DSPP_DITHER_DEPTH;
+		if (!pp_ops[DITHER].pp_set_config) {
 			pp_dither_config(addr, pp_sts,
 				&mdss_pp_res->dither_disp_cfg[disp_num]);
 		} else {
-			addr = base + MDSS_MDP_REG_DSPP_DITHER_DEPTH;
 			pp_ops[DITHER].pp_set_config(addr, pp_sts,
 			      &mdss_pp_res->dither_disp_cfg[disp_num], DSPP);
 		}

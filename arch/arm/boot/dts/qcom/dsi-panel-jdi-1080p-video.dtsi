@@ -17,7 +17,7 @@
  *---------------------------------------------------------------------------
  */
 &mdss_mdp {
-	dsi_jdi_1080p_video: qcom,mdss_dsi_jdi_1080p_video {
+	dsi_jdi_1080p_video: dsi_jdi_1080_vid: qcom,mdss_dsi_jdi_1080p_video {
 		qcom,mdss-dsi-panel-name = "jdi 1080p video mode dsi panel";
 		qcom,mdss-dsi-panel-type = "dsi_video_mode";
 		qcom,mdss-dsi-panel-framerate = <60>;
@@ -41,7 +41,7 @@
 		qcom,mdss-dsi-underflow-color = <0xff>;
 		qcom,mdss-dsi-border-color = <0>;
 		qcom,mdss-dsi-on-command = [15 01 00 00 00 00 02 55 00
-				15 01 00 00 00 00 02 53 2C
+				15 01 00 00 00 00 02 53 2c
 				15 01 00 00 00 00 02 35 00
 				05 01 00 00 78 00 02 29 00
 				05 01 00 00 78 00 02 11 00];
