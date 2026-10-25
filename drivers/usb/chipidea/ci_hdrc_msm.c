@@ -57,7 +57,7 @@ static int ci_hdrc_msm_probe(struct platform_device *pdev)
 	struct platform_device *plat_ci;
 	struct usb_phy *phy;
 
-	dev_dbg(&pdev->dev, "ci_hdrc_msm_probe\n");
+	pr_info("ci_hdrc_msm_probe: ENTER\n");
 
 	/*
 	 * OTG(PHY) driver takes care of PHY initialization, clock management,
@@ -65,18 +65,27 @@ static int ci_hdrc_msm_probe(struct platform_device *pdev)
 	 * management.
 	 */
 	phy = devm_usb_get_phy_by_phandle(&pdev->dev, "usb-phy", 0);
-	if (IS_ERR(phy))
+	if (IS_ERR(phy)) {
+		pr_err("ci_hdrc_msm_probe: devm_usb_get_phy_by_phandle failed: %ld\n", PTR_ERR(phy));
 		return PTR_ERR(phy);
+	}
+	pr_info("ci_hdrc_msm_probe: got phy %s\n", dev_name(phy->dev));
 
 	ci_hdrc_msm_platdata.usb_phy = phy;
+
+	/* Wake up PHY so USB clocks are running during controller probe */
+	pm_runtime_get_sync(phy->dev);
 
 	plat_ci = ci_hdrc_add_device(&pdev->dev,
 				pdev->resource, pdev->num_resources,
 				&ci_hdrc_msm_platdata);
+	pm_runtime_put(phy->dev);
+
 	if (IS_ERR(plat_ci)) {
-		dev_err(&pdev->dev, "ci_hdrc_add_device failed!\n");
+		pr_err("ci_hdrc_msm: ci_hdrc_add_device failed: %ld\n", PTR_ERR(plat_ci));
 		return PTR_ERR(plat_ci);
 	}
+	pr_info("ci_hdrc_msm: ci_hdrc_add_device succeeded\n");
 
 	platform_set_drvdata(pdev, plat_ci);
 

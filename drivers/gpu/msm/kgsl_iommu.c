@@ -2564,12 +2564,21 @@ static int _kgsl_iommu_cb_probe(struct kgsl_device *device,
 
 	/* arm-smmu driver we'll have the right device pointer here. */
 	if (of_find_property(node, "iommus", NULL)) {
+		if (!pdev) {
+			KGSL_CORE_ERR("dt: pdev for %s not found\n", node->name);
+			return -EPROBE_DEFER;
+		}
 		ctx->dev = &pdev->dev;
+		pr_info("kgsl_iommu_cb_probe: %s using arm-smmu dev %s\n",
+			ctx->name, dev_name(ctx->dev));
 	} else {
 		ctx->dev = kgsl_mmu_get_ctx(ctx->name);
 
-		if (IS_ERR(ctx->dev))
+		if (IS_ERR(ctx->dev)) {
+			KGSL_CORE_ERR("kgsl_mmu_get_ctx failed for %s: %ld\n",
+				ctx->name, PTR_ERR(ctx->dev));
 			return PTR_ERR(ctx->dev);
+		}
 	}
 
 	return 0;
@@ -2648,7 +2657,10 @@ static int _kgsl_iommu_probe(struct kgsl_device *device,
 		device->mmu.secure_align_mask = 0xfff;
 
 	/* Fill out the rest of the devices in the node */
-	of_platform_populate(node, NULL, NULL, &pdev->dev);
+	{
+		struct device *parent_dev = pdev ? &pdev->dev : &device->pdev->dev;
+		of_platform_populate(node, NULL, NULL, parent_dev);
+	}
 
 	for_each_child_of_node(node, child) {
 		int ret;

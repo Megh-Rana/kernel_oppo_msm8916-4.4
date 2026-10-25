@@ -2578,6 +2578,7 @@ static int kgsl_setup_dma_buf(struct kgsl_device *device,
 	attach = dma_buf_attach(dmabuf, device->dev);
 	if (IS_ERR_OR_NULL(attach)) {
 		ret = attach ? PTR_ERR(attach) : -EINVAL;
+		pr_err("kgsl: dma_buf_attach failed: %d\n", ret);
 		goto out;
 	}
 
@@ -2597,6 +2598,7 @@ static int kgsl_setup_dma_buf(struct kgsl_device *device,
 
 	if (IS_ERR_OR_NULL(sg_table)) {
 		ret = PTR_ERR(sg_table);
+		pr_err("kgsl: dma_buf_map_attachment failed: %d\n", ret);
 		goto out;
 	}
 
@@ -2614,6 +2616,7 @@ static int kgsl_setup_dma_buf(struct kgsl_device *device,
 		 */
 
 		if (PagePrivate(sg_page(s)) != priv) {
+			pr_err("kgsl: PagePrivate mismatch priv=%d\n", priv);
 			ret = -EPERM;
 			goto out;
 		}
@@ -2741,15 +2744,22 @@ long kgsl_ioctl_map_user_mem(struct kgsl_device_private *dev_priv,
 	case KGSL_MEM_ENTRY_USER:
 		result = _map_usermem_addr(dev_priv->device, private->pagetable,
 			entry, param->hostptr, param->offset, param->len);
+		if (result)
+			pr_err("kgsl: _map_usermem_addr failed: %d\n", result);
 		break;
 	case KGSL_MEM_ENTRY_ION:
-		if (param->offset != 0)
+		if (param->offset != 0) {
+			pr_err("kgsl: ION map non-zero offset %zu\n", param->offset);
 			result = -EINVAL;
-		else
+		} else {
 			result = _map_usermem_dma_buf(dev_priv->device,
 				private->pagetable, entry, param->fd);
+			if (result)
+				pr_err("kgsl: _map_usermem_dma_buf failed: %d (fd=%d)\n", result, param->fd);
+		}
 		break;
 	default:
+		pr_err("kgsl: unsupported memtype %d\n", memtype);
 		result = -EOPNOTSUPP;
 		break;
 	}
@@ -2759,6 +2769,8 @@ long kgsl_ioctl_map_user_mem(struct kgsl_device_private *dev_priv,
 
 	if ((param->flags & KGSL_MEMFLAGS_SECURE) &&
 		(entry->memdesc.size & mmu->secure_align_mask)) {
+		pr_err("kgsl: secure align mask error: size=%llu mask=0x%x\n",
+			(unsigned long long)entry->memdesc.size, mmu->secure_align_mask);
 		result = -EINVAL;
 		goto error_attach;
 	}
@@ -2775,8 +2787,10 @@ long kgsl_ioctl_map_user_mem(struct kgsl_device_private *dev_priv,
 
 	result = kgsl_mem_entry_attach_process(dev_priv->device, private,
 		entry);
-	if (result)
+	if (result) {
+		pr_err("kgsl: kgsl_mem_entry_attach_process failed: %d\n", result);
 		goto error_attach;
+	}
 
 	/* Adjust the returned value for a non 4k aligned offset */
 	param->gpuaddr = (unsigned long)

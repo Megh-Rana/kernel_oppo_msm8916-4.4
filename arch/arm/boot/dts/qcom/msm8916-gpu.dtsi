@@ -153,7 +153,7 @@
 		};
 	};
 
-	kgsl_msm_iommu: qcom,kgsl-iommu@1f00000 {
+	kgsl_msm_iommu: qcom,kgsl-iommu {
 		compatible = "qcom,kgsl-smmu-v2";
 		reg = <0x1f00000 0x10000>;
 		/*
@@ -170,6 +170,8 @@
 		qcom,retention;
 		gfx3d_user: gfx3d_user {
 			compatible = "qcom,smmu-kgsl-cb";
+			label = "gfx3d_user";
+			iommus = <&kgsl_smmu 0>;
 			qcom,gpu-offset = <0xa000>;
 		};
 	};

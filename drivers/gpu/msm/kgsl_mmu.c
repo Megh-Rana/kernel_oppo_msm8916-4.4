@@ -667,6 +667,8 @@ static int nommu_get_gpuaddr(struct kgsl_pagetable *pagetable,
 		}
 
 		if (!is_contig) {
+			pr_err("nommu_get_gpuaddr: non-contiguous sg (nents=%d size=%llu)\n",
+				memdesc->sgt->nents, (unsigned long long)memdesc->size);
 			WARN_ONCE(1,
 				"Attempt to map non-contiguous memory with NOMMU\n");
 			return -EINVAL;

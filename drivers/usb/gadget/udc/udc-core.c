@@ -406,6 +406,8 @@ int usb_add_gadget_udc_release(struct device *parent, struct usb_gadget *gadget,
 	if (ret)
 		goto err4;
 
+	pr_info("udc-core: added udc %s to udc_list\n", dev_name(&udc->dev));
+
 	usb_gadget_set_state(gadget, USB_STATE_NOTATTACHED);
 	udc->vbus = true;
 
@@ -567,10 +569,13 @@ int usb_gadget_probe_driver(struct usb_gadget_driver *driver)
 			goto found;
 	}
 
-	pr_debug("couldn't find an available UDC\n");
+	pr_info("udc-core: couldn't find an available UDC for driver %s (udc_list empty=%d)\n",
+		driver->function, list_empty(&udc_list));
 	mutex_unlock(&udc_lock);
 	return -ENODEV;
 found:
+	pr_info("udc-core: binding driver %s to udc %s\n",
+		driver->function, udc->gadget->name);
 	ret = udc_bind_to_driver(udc, driver);
 	mutex_unlock(&udc_lock);
 	return ret;

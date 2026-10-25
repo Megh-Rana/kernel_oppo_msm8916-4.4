@@ -4050,6 +4050,7 @@ static const struct of_device_id arm_smmu_of_match[] = {
 	{ .compatible = "arm,mmu-401", .data = (void *)ARM_SMMU_V1 },
 	{ .compatible = "arm,mmu-500", .data = (void *)ARM_SMMU_V2 },
 	{ .compatible = "qcom,smmu-v2", .data = (void *)ARM_SMMU_V2 },
+	{ .compatible = "qcom,msm-smmu-v2", .data = (void *)ARM_SMMU_V2 },
 	{ },
 };
 MODULE_DEVICE_TABLE(of, arm_smmu_of_match);
@@ -4162,7 +4163,8 @@ static int arm_smmu_device_dt_probe(struct platform_device *pdev)
 	if (err)
 		goto out_put_masters;
 
-	if (of_device_is_compatible(dev->of_node, "qcom,smmu-v2"))
+	if (of_device_is_compatible(dev->of_node, "qcom,smmu-v2") ||
+	    of_device_is_compatible(dev->of_node, "qcom,msm-smmu-v2"))
 		smmu->model = SMMU_MODEL_QCOM_V2;
 
 	if (smmu->version > ARM_SMMU_V1 &&

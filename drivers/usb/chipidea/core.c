@@ -886,6 +886,9 @@ static int ci_hdrc_probe(struct platform_device *pdev)
 
 	struct ci_hdrc_platform_data *platdata = dev_get_platdata(dev);
 
+	pr_info("ci_hdrc: ci_hdrc_probe entered (dr_mode=%d)\n",
+		platdata ? platdata->dr_mode : -1);
+
 	if (!platdata) {
 		dev_err(dev, "platform data missing\n");
 		return -ENODEV;
@@ -993,6 +996,7 @@ static int ci_hdrc_probe(struct platform_device *pdev)
 
 	if (dr_mode == USB_DR_MODE_OTG || dr_mode == USB_DR_MODE_PERIPHERAL) {
 		ret = ci_hdrc_gadget_init(ci);
+		pr_info("ci_hdrc: ci_hdrc_gadget_init returned %d\n", ret);
 		if (ret) {
 			if (ret == -ENXIO)
 				dev_info(dev, "doesn't support gadget\n");
