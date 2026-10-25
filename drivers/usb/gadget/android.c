@@ -340,16 +340,32 @@ static void android_clean_functions(struct android_dev *dev)
 	}
 }
 
+static bool android_has_function(struct android_dev *dev, const char *name)
+{
+	return strstr(dev->functions_str, name) != NULL;
+}
+
 static int android_enable(struct android_dev *dev)
 {
 	struct usb_composite_dev *cdev = dev->cdev;
 	int ret;
 
-	if (dev->enabled)
-		android_disable(dev);
-
 	if (!cdev || !cdev->gadget)
 		return -ENODEV;
+
+	/* If adb is requested but adbd hasn't written descriptors yet, defer connect */
+	if (android_has_function(dev, "adb") && !dev->ffs_ready) {
+		pr_info("android_usb: adb requested but descriptors not ready, waiting for adbd\n");
+		dev->enabled = true;
+		return 0;
+	}
+
+	if (dev->enabled) {
+		if (cdev->gadget)
+			usb_gadget_disconnect(cdev->gadget);
+		android_clean_functions(dev);
+		usb_remove_config(cdev, &android_config_driver);
+	}
 
 	pr_info("android_usb: enabling '%s', VID=0x%04x PID=0x%04x\n",
 		dev->functions_str, dev->idVendor, dev->idProduct);
