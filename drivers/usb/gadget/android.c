@@ -57,6 +57,7 @@ struct android_dev {
 	char serial[256];
 	char functions_str[256];
 	char ffs_aliases[256];
+	bool ffs_ready;
 
 	/* Function instances */
 	struct usb_function_instance *fi_ffs;
@@ -124,6 +125,39 @@ static struct usb_configuration android_config_driver = {
 
 /* Forward declarations */
 static int android_bind_config(struct usb_configuration *c);
+static int android_enable(struct android_dev *dev);
+static void android_disable(struct android_dev *dev);
+
+static int functionfs_ready_callback(struct ffs_data *ffs)
+{
+	struct android_dev *dev = g_android_dev;
+
+	pr_info("android_usb: FunctionFS 'adb' ready callback received!\n");
+	if (!dev)
+		return -ENODEV;
+
+	mutex_lock(&dev->mutex);
+	dev->ffs_ready = true;
+	if (dev->enabled && dev->cdev) {
+		pr_info("android_usb: re-enabling gadget with adb\n");
+		android_enable(dev);
+	}
+	mutex_unlock(&dev->mutex);
+	return 0;
+}
+
+static void functionfs_closed_callback(struct ffs_data *ffs)
+{
+	struct android_dev *dev = g_android_dev;
+
+	pr_info("android_usb: FunctionFS 'adb' closed callback received\n");
+	if (!dev)
+		return;
+
+	mutex_lock(&dev->mutex);
+	dev->ffs_ready = false;
+	mutex_unlock(&dev->mutex);
+}
 
 static void android_work(struct work_struct *data)
 {
@@ -181,11 +215,20 @@ static int android_bind_config(struct usb_configuration *c)
 			if (!dev->fi_ffs)
 				dev->fi_ffs = usb_get_function_instance("ffs");
 			if (!IS_ERR_OR_NULL(dev->fi_ffs)) {
-				dev->f_ffs = usb_get_function(dev->fi_ffs);
-				if (!IS_ERR_OR_NULL(dev->f_ffs)) {
-					ret = usb_add_function(c, dev->f_ffs);
-					if (ret)
-						pr_err("android_usb: add ffs failed %d\n", ret);
+				struct f_fs_opts *opts = to_f_fs_opts(dev->fi_ffs);
+				opts->dev->ffs_ready_callback = functionfs_ready_callback;
+				opts->dev->ffs_closed_callback = functionfs_closed_callback;
+				if (!opts->dev->desc_ready) {
+					pr_info("android_usb: ffs 'adb' descriptors not ready yet, waiting for adbd\n");
+				} else {
+					dev->f_ffs = usb_get_function(dev->fi_ffs);
+					if (!IS_ERR_OR_NULL(dev->f_ffs)) {
+						ret = usb_add_function(c, dev->f_ffs);
+						if (ret)
+							pr_err("android_usb: add ffs failed %d\n", ret);
+						else
+							pr_info("android_usb: add ffs succeeded!\n");
+					}
 				}
 			}
 		} else if (!strcmp(name, "mtp")) {
@@ -303,7 +346,7 @@ static int android_enable(struct android_dev *dev)
 	int ret;
 
 	if (dev->enabled)
-		return 0;
+		android_disable(dev);
 
 	if (!cdev || !cdev->gadget)
 		return -ENODEV;
@@ -350,6 +393,8 @@ static void android_disable(struct android_dev *dev)
 		usb_gadget_disconnect(cdev->gadget);
 
 	android_clean_functions(dev);
+	if (cdev)
+		usb_remove_config(cdev, &android_config_driver);
 
 	dev->enabled = false;
 	dev->connected = false;
@@ -605,6 +650,8 @@ static ssize_t ffs_aliases_store(struct kobject *kobj, struct kobj_attribute *at
 			struct f_fs_opts *opts = to_f_fs_opts(dev->fi_ffs);
 			ffs_name_dev(opts->dev, "adb");
 			opts->no_configfs = true;
+			opts->dev->ffs_ready_callback = functionfs_ready_callback;
+			opts->dev->ffs_closed_callback = functionfs_closed_callback;
 			pr_info("android_usb: registered ffs 'adb' device alias\n");
 		}
 	}
@@ -713,6 +760,8 @@ static int android_bind(struct usb_composite_dev *cdev)
 		struct f_fs_opts *opts = to_f_fs_opts(dev->fi_ffs);
 		ffs_name_dev(opts->dev, "adb");
 		opts->no_configfs = true;
+		opts->dev->ffs_ready_callback = functionfs_ready_callback;
+		opts->dev->ffs_closed_callback = functionfs_closed_callback;
 		pr_info("android_usb: FunctionFS 'adb' device pre-registered\n");
 	}
 
