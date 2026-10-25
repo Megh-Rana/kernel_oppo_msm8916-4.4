@@ -20,6 +20,7 @@
 #include <linux/pm_runtime.h>
 #include <linux/usb/ch9.h>
 #include <linux/usb/gadget.h>
+#include <linux/usb/otg.h>
 #include <linux/usb/otg-fsm.h>
 #include <linux/usb/chipidea.h>
 
@@ -1941,6 +1942,9 @@ static int udc_start(struct ci_hdrc *ci)
 	if (retval)
 		goto destroy_eps;
 
+	if (ci->usb_phy && ci->usb_phy->otg)
+		otg_set_peripheral(ci->usb_phy->otg, &ci->gadget);
+
 	pm_runtime_no_callbacks(&ci->gadget.dev);
 	pm_runtime_enable(&ci->gadget.dev);
 
@@ -1964,6 +1968,9 @@ void ci_hdrc_gadget_destroy(struct ci_hdrc *ci)
 {
 	if (!ci->roles[CI_ROLE_GADGET])
 		return;
+
+	if (ci->usb_phy && ci->usb_phy->otg)
+		otg_set_peripheral(ci->usb_phy->otg, NULL);
 
 	usb_del_gadget_udc(&ci->gadget);
 

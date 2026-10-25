@@ -435,15 +435,11 @@ static void *persistent_ram_iomap(phys_addr_t start, size_t size,
 	void *va;
 
 	if (!request_mem_region(start, size, "persistent_ram")) {
-		pr_err("request mem region (0x%llx@0x%llx) failed\n",
+		pr_warn("request mem region (0x%llx@0x%llx) failed, continuing anyway\n",
 			(unsigned long long)size, (unsigned long long)start);
-		return NULL;
 	}
 
-	if (memtype)
-		va = ioremap(start, size);
-	else
-		va = ioremap_wc(start, size);
+	va = ioremap_wc(start, size);
 
 	/*
 	 * Since request_mem_region() and ioremap() are byte-granularity
@@ -501,6 +497,7 @@ static int persistent_ram_post_init(struct persistent_ram_zone *prz, u32 sig,
 			pr_debug("found existing buffer, size %zu, start %zu\n",
 				 buffer_size(prz), buffer_start(prz));
 			persistent_ram_save_old(prz);
+			persistent_ram_zap(prz);
 			return 0;
 		}
 	} else {

@@ -480,6 +480,14 @@ static int log_store(int facility, int level,
 	log_next_idx += msg->len;
 	log_next_seq++;
 
+#ifdef CONFIG_PSTORE_RAM
+	{
+		extern void ramoops_console_write_buf(const char *buf, size_t size);
+		ramoops_console_write_buf(text, text_len);
+		ramoops_console_write_buf("\n", 1);
+	}
+#endif
+
 	return msg->text_len;
 }
 

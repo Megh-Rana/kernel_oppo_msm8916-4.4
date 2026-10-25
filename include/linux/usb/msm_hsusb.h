@@ -217,6 +217,9 @@ struct msm_otg {
 	struct clk *clk;
 	struct clk *pclk;
 	struct clk *core_clk;
+	struct clk *xo_clk;
+	struct clk *sleep_clk;
+	struct clk *bus_clks[3];
 	void __iomem *regs;
 #define ID		0
 #define B_SESS_VLD	1
@@ -245,6 +248,7 @@ struct msm_otg {
 
 	struct gpio_desc *switch_gpio;
 	struct notifier_block reboot;
+	struct power_supply *usb_psy;
 };
 
 #ifdef CONFIG_USB_BAM

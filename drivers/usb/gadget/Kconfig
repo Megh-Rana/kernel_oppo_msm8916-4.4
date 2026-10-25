@@ -603,4 +603,20 @@ source "drivers/usb/gadget/legacy/Kconfig"
 
 endchoice
 
+config USB_G_ANDROID
+	boolean "Android Composite Gadget"
+	select USB_LIBCOMPOSITE
+	select USB_F_FS
+	select USB_F_MASS_STORAGE
+	select USB_F_ACCESSORY
+	select USB_F_AUDIO_SRC
+	select USB_F_MIDI
+	select USB_F_RNDIS
+	select USB_U_ETHER
+	help
+	  The Android Composite Gadget supports multiple USB
+	  functions: adb, mtp, ptp, mass storage, accessory, audio_source, midi and rndis.
+	  Each function can be configured and enabled/disabled
+	  dynamically from userspace through a sysfs interface.
+
 endif # USB_GADGET

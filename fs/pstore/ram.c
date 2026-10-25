@@ -49,7 +49,7 @@ static ulong ramoops_console_size = MIN_MEM_SIZE;
 module_param_named(console_size, ramoops_console_size, ulong, 0400);
 MODULE_PARM_DESC(console_size, "size of kernel console log");
 
-static ulong ramoops_ftrace_size = MIN_MEM_SIZE;
+static ulong ramoops_ftrace_size = 0;
 module_param_named(ftrace_size, ramoops_ftrace_size, ulong, 0400);
 MODULE_PARM_DESC(ftrace_size, "size of ftrace log");
 
@@ -502,6 +502,8 @@ static int ramoops_init_prz(struct device *dev, struct ramoops_context *cxt,
 void notrace ramoops_console_write_buf(const char *buf, size_t size)
 {
 	struct ramoops_context *cxt = &oops_cxt;
+	if (!cxt || !cxt->cprz)
+		return;
 	persistent_ram_write(cxt->cprz, buf, size);
 }
 

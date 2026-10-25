@@ -2537,6 +2537,9 @@ void usb_composite_overwrite_options(struct usb_composite_dev *cdev,
 	struct usb_gadget_strings	*gstr = cdev->driver->strings[0];
 	struct usb_string		*dev_str = gstr->strings;
 
+	if (!covr)
+		return;
+
 	if (covr->idVendor)
 		desc->idVendor = cpu_to_le16(covr->idVendor);
 
