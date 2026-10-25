@@ -84,7 +84,7 @@ struct android_dev {
 	struct usb_function *f_rndis;
 };
 
-static struct class *android_class;
+extern struct class *android_class;
 static struct android_dev *g_android_dev;
 
 static struct usb_device_descriptor android_device_desc = {
@@ -134,7 +134,7 @@ static void android_work(struct work_struct *data)
 	char **uevent_envp = NULL;
 	unsigned long flags;
 
-	if (!dev->cdev || !dev->cdev->gadget)
+	if (!dev || !dev->dev || !dev->cdev || !dev->cdev->gadget)
 		return;
 
 	spin_lock_irqsave(&dev->cdev->lock, flags);
@@ -783,26 +783,13 @@ static int android_usb_probe(struct platform_device *pdev)
 	strlcpy(dev->functions_str, "adb", sizeof(dev->functions_str));
 	strlcpy(dev->ffs_aliases, "adb", sizeof(dev->ffs_aliases));
 
-	/* Register composite driver - if UDC is not ready yet, defer! */
-	ret = usb_composite_probe(&android_usb_driver);
-	if (ret) {
-		if (ret == -ENODEV) {
-			pr_info("android_usb: UDC not ready yet, deferring probe\n");
-			ret = -EPROBE_DEFER;
-		} else {
-			pr_err("android_usb: usb_composite_probe failed: %d\n", ret);
-		}
-		g_android_dev = NULL;
-		kfree(dev);
-		return ret;
-	}
-
+	/* Create or reuse android_class */
 	if (!android_class) {
 		android_class = class_create(THIS_MODULE, "android_usb");
 		if (IS_ERR(android_class)) {
 			ret = PTR_ERR(android_class);
+			pr_err("android_usb: failed to create android_class: %d\n", ret);
 			android_class = NULL;
-			usb_composite_unregister(&android_usb_driver);
 			g_android_dev = NULL;
 			kfree(dev);
 			return ret;
@@ -812,7 +799,8 @@ static int android_usb_probe(struct platform_device *pdev)
 	dev->dev = device_create(android_class, &pdev->dev, MKDEV(0, 0), dev, "android0");
 	if (IS_ERR(dev->dev)) {
 		ret = PTR_ERR(dev->dev);
-		usb_composite_unregister(&android_usb_driver);
+		pr_err("android_usb: failed to create android0: %d\n", ret);
+		dev->dev = NULL;
 		g_android_dev = NULL;
 		kfree(dev);
 		return ret;
@@ -821,7 +809,7 @@ static int android_usb_probe(struct platform_device *pdev)
 	ret = sysfs_create_group(&dev->dev->kobj, &android_usb_attr_group);
 	if (ret) {
 		device_destroy(android_class, MKDEV(0, 0));
-		usb_composite_unregister(&android_usb_driver);
+		dev->dev = NULL;
 		g_android_dev = NULL;
 		kfree(dev);
 		return ret;
@@ -861,6 +849,22 @@ static int android_usb_probe(struct platform_device *pdev)
 		(void)ret;
 	}
 
+	/* Register composite driver - if UDC is not ready yet, defer! */
+	ret = usb_composite_probe(&android_usb_driver);
+	if (ret) {
+		if (ret == -ENODEV) {
+			pr_info("android_usb: UDC not ready yet, deferring probe\n");
+			ret = -EPROBE_DEFER;
+		} else {
+			pr_err("android_usb: usb_composite_probe failed: %d\n", ret);
+		}
+		device_destroy(android_class, MKDEV(0, 0));
+		dev->dev = NULL;
+		g_android_dev = NULL;
+		kfree(dev);
+		return ret;
+	}
+
 	platform_set_drvdata(pdev, dev);
 	pr_info("android_usb: registered successfully\n");
 	return 0;
@@ -874,11 +878,8 @@ static int android_usb_remove(struct platform_device *pdev)
 		return 0;
 
 	usb_composite_unregister(&android_usb_driver);
-	device_destroy(android_class, MKDEV(0, 0));
-	if (android_class) {
-		class_destroy(android_class);
-		android_class = NULL;
-	}
+	if (android_class && dev->dev)
+		device_destroy(android_class, MKDEV(0, 0));
 	g_android_dev = NULL;
 	kfree(dev);
 	return 0;

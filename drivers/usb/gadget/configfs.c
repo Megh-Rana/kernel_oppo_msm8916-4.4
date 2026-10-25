@@ -20,7 +20,8 @@ extern int acc_ctrlrequest(struct usb_composite_dev *cdev,
 				const struct usb_ctrlrequest *ctrl);
 void acc_disconnect(void);
 #endif
-static struct class *android_class;
+struct class *android_class;
+EXPORT_SYMBOL_GPL(android_class);
 static struct device *android_device;
 static int index;
 static int gadget_index;
@@ -1906,9 +1907,11 @@ static int __init gadget_cfs_init(void)
 	ret = configfs_register_subsystem(&gadget_subsys);
 
 #ifdef CONFIG_USB_CONFIGFS_UEVENT
-	android_class = class_create(THIS_MODULE, "android_usb");
-	if (IS_ERR(android_class))
-		return PTR_ERR(android_class);
+	if (!android_class) {
+		android_class = class_create(THIS_MODULE, "android_usb");
+		if (IS_ERR(android_class))
+			return PTR_ERR(android_class);
+	}
 #endif
 
 	return ret;
@@ -1920,8 +1923,10 @@ static void __exit gadget_cfs_exit(void)
 	debug_debugfs_exit();
 	configfs_unregister_subsystem(&gadget_subsys);
 #ifdef CONFIG_USB_CONFIGFS_UEVENT
-	if (!IS_ERR(android_class))
+	if (android_class && !IS_ERR(android_class)) {
 		class_destroy(android_class);
+		android_class = NULL;
+	}
 #endif
 
 }
