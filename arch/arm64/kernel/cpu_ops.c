@@ -27,12 +27,18 @@
 extern const struct cpu_operations smp_spin_table_ops;
 extern const struct cpu_operations acpi_parking_protocol_ops;
 extern const struct cpu_operations cpu_psci_ops;
+#if defined(CONFIG_MSM_CPU_PWR_CTL) || defined(CONFIG_ARCH_QCOM)
+extern const struct cpu_operations msm_cortex_a_ops;
+#endif
 
 const struct cpu_operations *cpu_ops[NR_CPUS];
 
 static const struct cpu_operations *dt_supported_cpu_ops[] __initconst = {
 	&smp_spin_table_ops,
 	&cpu_psci_ops,
+#if defined(CONFIG_MSM_CPU_PWR_CTL) || defined(CONFIG_ARCH_QCOM)
+	&msm_cortex_a_ops,
+#endif
 	NULL,
 };
 

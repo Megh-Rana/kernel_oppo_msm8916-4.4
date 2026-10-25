@@ -56,4 +56,7 @@ static inline int get_logical_index(u64 mpidr)
 	return -EINVAL;
 }
 
+extern void secondary_holding_pen(void);
+extern volatile unsigned long secondary_holding_pen_release;
+
 #endif /* __ASM_SMP_PLAT_H */

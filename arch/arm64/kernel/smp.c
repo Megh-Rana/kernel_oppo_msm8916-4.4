@@ -723,7 +723,7 @@ void arch_send_call_function_single_ipi(int cpu)
 	smp_cross_call_common(cpumask_of(cpu), IPI_CALL_FUNC);
 }
 
-#ifdef CONFIG_ARM64_ACPI_PARKING_PROTOCOL
+#if defined(CONFIG_ARM64_ACPI_PARKING_PROTOCOL) || defined(CONFIG_MSM_CPU_PWR_CTL)
 void arch_send_wakeup_ipi_mask(const struct cpumask *mask)
 {
 	smp_cross_call(mask, IPI_WAKEUP);
