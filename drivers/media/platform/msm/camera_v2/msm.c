@@ -412,7 +412,8 @@ int msm_sd_register(struct msm_sd_subdev *msm_subdev)
 	if (WARN_ON(!msm_subdev))
 		return -EINVAL;
 
-	if (WARN_ON(!msm_v4l2_dev) || WARN_ON(!msm_v4l2_dev->dev))
+	if (WARN_ON(!msm_v4l2_dev) || WARN_ON(!msm_v4l2_dev->dev) ||
+	    WARN_ON(!msm_v4l2_dev->mdev))
 		return -EIO;
 
 	mutex_lock(&ordered_sd_mtx);
@@ -1436,6 +1437,7 @@ video_fail:
 	kzfree(pvdev);
 pvdev_fail:
 	kzfree(msm_v4l2_dev);
+	msm_v4l2_dev = NULL;
 probe_end:
 	return rc;
 }

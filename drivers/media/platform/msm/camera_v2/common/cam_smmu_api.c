@@ -2429,10 +2429,10 @@ static int cam_populate_smmu_context_banks(struct device *dev,
 	if (type == CAM_QSMMU) {
 		ctx = msm_iommu_get_ctx(cb->name);
 		if (IS_ERR_OR_NULL(ctx)) {
-			rc = PTR_ERR(ctx);
+			rc = ctx ? PTR_ERR(ctx) : -EPROBE_DEFER;
 			pr_err("Invalid pointer of ctx : %s rc = %d\n",
 				 cb->name, rc);
-			return -EINVAL;
+			return rc;
 		}
 		CDBG("getting QSMMU ctx : %s\n", cb->name);
 	} else {
@@ -2473,16 +2473,16 @@ static int cam_smmu_probe(struct platform_device *pdev)
 	if (of_device_is_compatible(dev->of_node, "qcom,msm-cam-smmu-cb")) {
 		rc = cam_populate_smmu_context_banks(dev, CAM_ARM_SMMU);
 		if (rc < 0) {
-			pr_err("Error: populating context banks\n");
-			return -ENOMEM;
+			pr_err("Error: populating context banks: %d\n", rc);
+			return rc;
 		}
 		return rc;
 	}
 	if (of_device_is_compatible(dev->of_node, "qcom,qsmmu-cam-cb")) {
 		rc = cam_populate_smmu_context_banks(dev, CAM_QSMMU);
 		if (rc < 0) {
-			pr_err("Error: populating context banks\n");
-			return -ENOMEM;
+			pr_err("Error: populating context banks: %d\n", rc);
+			return rc;
 		}
 		return rc;
 	}

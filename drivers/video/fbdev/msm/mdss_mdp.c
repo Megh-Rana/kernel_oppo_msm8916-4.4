@@ -1897,15 +1897,14 @@ static int mdss_mdp_irq_clk_setup(struct mdss_data_type *mdata)
 		ret = of_property_read_u32(mdata->pdev->dev.of_node,
 			"vdd-cx-min-uV", &mdata->vdd_cx_min_uv);
 		if (ret) {
-			pr_err("min uV for vdd-cx not specified. rc=%d\n", ret);
-			return ret;
-		}
-
-		ret = of_property_read_u32(mdata->pdev->dev.of_node,
-			"vdd-cx-max-uV", &mdata->vdd_cx_max_uv);
-		if (ret) {
-			pr_err("max uV for vdd-cx not specified. rc=%d\n", ret);
-			return ret;
+			mdata->vdd_cx_min_uv = RPM_REGULATOR_CORNER_SVS_SOC;
+			mdata->vdd_cx_max_uv = RPM_REGULATOR_CORNER_SUPER_TURBO;
+			pr_debug("min uV for vdd-cx not specified, using RPM corners\n");
+		} else {
+			ret = of_property_read_u32(mdata->pdev->dev.of_node,
+				"vdd-cx-max-uV", &mdata->vdd_cx_max_uv);
+			if (ret)
+				mdata->vdd_cx_max_uv = RPM_REGULATOR_CORNER_SUPER_TURBO;
 		}
 
 		pr_debug("vdd_cx [min_uV, max_uV] = [%d %d]\n",

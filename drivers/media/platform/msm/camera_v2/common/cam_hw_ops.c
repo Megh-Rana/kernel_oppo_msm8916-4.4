@@ -74,15 +74,17 @@ int cam_ahb_clk_init(struct platform_device *pdev)
 
 	of_node = pdev->dev.of_node;
 	data.cnt = of_property_count_strings(of_node, "bus-vectors");
-	if (data.cnt == 0) {
-		pr_err("no vectors strings found in device tree, count=%d",
+	if (data.cnt <= 0) {
+		pr_debug("no vectors strings found in device tree, count=%d\n",
 			data.cnt);
+		data.probe_done = TRUE;
 		return 0;
 	}
 
 	cnt = of_property_count_u32_elems(of_node, "qcom,bus-votes");
-	if (cnt == 0) {
-		pr_err("no vector values found in device tree, count=%d", cnt);
+	if (cnt <= 0) {
+		pr_debug("no vector values found in device tree, count=%d\n", cnt);
+		data.probe_done = TRUE;
 		return 0;
 	}
 
@@ -219,6 +221,9 @@ int cam_consolidate_ahb_vote(enum cam_ahb_clk_client id,
 	int i = 0;
 	u32 max = 0;
 
+	if (!data.ahb_client)
+		return 0;
+
 	CDBG("dbg: id :%u, vote : 0x%x\n", id, vote);
 	mutex_lock(&data.lock);
 	data.clients[id].vote = vote;
@@ -288,7 +293,9 @@ int cam_config_ahb_clk(struct device *dev, unsigned long freq,
 		return -EINVAL;
 	}
 
-	if (data.probe_done != TRUE) {
+	if (data.probe_done != TRUE || !data.ahb_client) {
+		if (!data.ahb_client)
+			return 0;
 		pr_err("ahb init is not done yet\n");
 		return -EINVAL;
 	}
