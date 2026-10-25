@@ -285,8 +285,8 @@ int mdss_smmu_set_attribute(int domain, int flag, int val)
 	int rc = 0, domain_attr = 0;
 	struct mdss_smmu_client *mdss_smmu = mdss_smmu_get_cb(domain);
 
-	if (!mdss_smmu) {
-		pr_err("not able to get smmu context\n");
+	if (!mdss_smmu || !mdss_smmu->mmu_mapping || !mdss_smmu->mmu_mapping->domain) {
+		pr_debug("not able to get smmu context\n");
 		return -EINVAL;
 	}
 
@@ -333,6 +333,7 @@ static int mdss_smmu_attach_v2(struct mdss_data_type *mdata)
 			mdss_smmu->handoff_pending = false;
 
 			if (!mdss_smmu->domain_attached &&
+				mdss_smmu->mmu_mapping &&
 				mdss_smmu_is_valid_domain_condition(mdata,
 					i, true)) {
 				rc = arm_iommu_attach_device(
@@ -512,8 +513,11 @@ static int mdss_smmu_dma_alloc_coherent_v2(struct device *dev, size_t size,
 		pr_err("dma alloc coherent failed!\n");
 		return -ENOMEM;
 	}
-	*phys = iommu_iova_to_phys(mdss_smmu->mmu_mapping->domain,
-			*iova);
+	if (mdss_smmu->mmu_mapping && mdss_smmu->mmu_mapping->domain)
+		*phys = iommu_iova_to_phys(mdss_smmu->mmu_mapping->domain,
+				*iova);
+	else
+		*phys = *iova;
 	return 0;
 }
 
@@ -539,8 +543,8 @@ static int mdss_smmu_map_v2(int domain, phys_addr_t iova, phys_addr_t phys,
 		int gfp_order, int prot)
 {
 	struct mdss_smmu_client *mdss_smmu = mdss_smmu_get_cb(domain);
-	if (!mdss_smmu) {
-		pr_err("not able to get smmu context\n");
+	if (!mdss_smmu || !mdss_smmu->mmu_mapping || !mdss_smmu->mmu_mapping->domain) {
+		pr_debug("not able to get smmu context or domain\n");
 		return -EINVAL;
 	}
 
@@ -551,8 +555,8 @@ static int mdss_smmu_map_v2(int domain, phys_addr_t iova, phys_addr_t phys,
 static void mdss_smmu_unmap_v2(int domain, unsigned long iova, int gfp_order)
 {
 	struct mdss_smmu_client *mdss_smmu = mdss_smmu_get_cb(domain);
-	if (!mdss_smmu) {
-		pr_err("not able to get smmu context\n");
+	if (!mdss_smmu || !mdss_smmu->mmu_mapping || !mdss_smmu->mmu_mapping->domain) {
+		pr_debug("not able to get smmu context or domain\n");
 		return;
 	}
 
