@@ -39,8 +39,7 @@
 		mba_mem: mba_region@0 {
 			compatible = "shared-dma-pool";
 			reusable;
-			alignment = <0 0x400000>;
-			size = <0 0x0400000>;
+			size = <0 0x0200000>;
 		};
 
 		secure_mem: secure_region@0 {
@@ -61,8 +60,7 @@
 		audio_mem: audio_region@0 {
 			compatible = "shared-dma-pool";
 			reusable;
-			alignment = <0 0x400000>;
-			size = <0 0x400000>;
+			size = <0 0x314000>;
 		};
 
 		cont_splash_mem: splash_region@83000000 {
