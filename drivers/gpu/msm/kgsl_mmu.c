@@ -389,7 +389,7 @@ kgsl_mmu_map(struct kgsl_pagetable *pagetable,
 	int size;
 
 	if (!pagetable)
-		return -EINVAL;
+		return 0;
 
 	if (!memdesc->gpuaddr)
 		return -EINVAL;
@@ -478,7 +478,7 @@ kgsl_mmu_unmap(struct kgsl_pagetable *pagetable,
 	int ret = 0;
 
 	if (!pagetable)
-		return -EINVAL;
+		return 0;
 
 	if (memdesc->size == 0)
 		return -EINVAL;

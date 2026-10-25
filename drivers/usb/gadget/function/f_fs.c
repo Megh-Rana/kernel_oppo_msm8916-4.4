@@ -1627,12 +1627,16 @@ ffs_fs_mount(struct file_system_type *t, int flags,
 	ffs->private_data = ffs_dev;
 	data.ffs_data = ffs;
 
-	inst_status = name_to_inst_status(ffs->dev_name, false);
+	inst_status = name_to_inst_status(ffs->dev_name, true);
 	if (IS_ERR(inst_status)) {
 		ffs_log("failed to find instance (%s)\n",
 				ffs->dev_name);
 		return ERR_PTR(-EINVAL);
 	}
+
+	mutex_lock(&inst_status->ffs_lock);
+	inst_status->inst_exist = true;
+	mutex_unlock(&inst_status->ffs_lock);
 
 	/* Store ffs to global status structure */
 	ffs_dev_lock();
@@ -4083,12 +4087,20 @@ static int _ffs_name_dev(struct ffs_dev *dev, const char *name)
 int ffs_name_dev(struct ffs_dev *dev, const char *name)
 {
 	int ret;
+	struct ffs_inst_status *inst_status;
 
 	ffs_log("enter");
 
 	ffs_dev_lock();
 	ret = _ffs_name_dev(dev, name);
 	ffs_dev_unlock();
+
+	inst_status = name_to_inst_status(name, true);
+	if (!IS_ERR(inst_status)) {
+		mutex_lock(&inst_status->ffs_lock);
+		inst_status->inst_exist = true;
+		mutex_unlock(&inst_status->ffs_lock);
+	}
 
 	ffs_log("exit");
 

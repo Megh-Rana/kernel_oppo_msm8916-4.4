@@ -356,10 +356,8 @@ static int kgsl_mem_entry_track_gpuaddr(struct kgsl_device *device,
 	/*
 	 * If SVM is enabled for this object then the address needs to be
 	 * assigned elsewhere
-	 * Also do not proceed further in case of NoMMU.
 	 */
-	if (kgsl_memdesc_use_cpu_map(&entry->memdesc) ||
-		(kgsl_mmu_get_mmutype(device) == KGSL_MMU_TYPE_NONE))
+	if (kgsl_memdesc_use_cpu_map(&entry->memdesc))
 		return 0;
 
 	pagetable = kgsl_memdesc_is_secured(&entry->memdesc) ?
@@ -420,7 +418,8 @@ static int kgsl_mem_entry_attach_process(struct kgsl_device *device,
 	 * Map the memory if a GPU address is already assigned, either through
 	 * kgsl_mem_entry_track_gpuaddr() or via some other SVM process
 	 */
-	if (entry->memdesc.gpuaddr) {
+	if (entry->memdesc.gpuaddr &&
+	    kgsl_mmu_get_mmutype(device) != KGSL_MMU_TYPE_NONE) {
 		if (entry->memdesc.flags & KGSL_MEMFLAGS_SPARSE_VIRT)
 			ret = kgsl_mmu_sparse_dummy_map(
 					entry->memdesc.pagetable,
@@ -430,8 +429,11 @@ static int kgsl_mem_entry_attach_process(struct kgsl_device *device,
 			ret = kgsl_mmu_map(entry->memdesc.pagetable,
 					&entry->memdesc);
 
-		if (ret)
+		if (ret) {
+			pr_err("kgsl: mmu_map failed: %d (gpuaddr=%llx pt=%p)\n",
+				ret, entry->memdesc.gpuaddr, entry->memdesc.pagetable);
 			kgsl_mem_entry_detach_process(entry);
+		}
 	}
 
 	kgsl_memfree_purge(entry->memdesc.pagetable, entry->memdesc.gpuaddr,
@@ -3249,8 +3251,11 @@ long kgsl_ioctl_gpumem_alloc(struct kgsl_device_private *dev_priv,
 
 	entry = gpumem_alloc_entry(dev_priv, (uint64_t) param->size, flags);
 
-	if (IS_ERR(entry))
+	if (IS_ERR(entry)) {
+		pr_err("kgsl: alloc_id failed: size=%zu flags=0x%x err=%ld\n",
+			param->size, param->flags, PTR_ERR(entry));
 		return PTR_ERR(entry);
+	}
 
 	param->gpuaddr = (unsigned long) entry->memdesc.gpuaddr;
 	param->size = (size_t) entry->memdesc.size;
@@ -3273,8 +3278,11 @@ long kgsl_ioctl_gpumem_alloc_id(struct kgsl_device_private *dev_priv,
 
 	entry = gpumem_alloc_entry(dev_priv, (uint64_t) param->size, flags);
 
-	if (IS_ERR(entry))
+	if (IS_ERR(entry)) {
+		pr_err("kgsl: alloc_id failed: size=%zu flags=0x%x err=%ld\n",
+			param->size, param->flags, PTR_ERR(entry));
 		return PTR_ERR(entry);
+	}
 
 	param->id = entry->id;
 	param->flags = (unsigned int) entry->memdesc.flags;
