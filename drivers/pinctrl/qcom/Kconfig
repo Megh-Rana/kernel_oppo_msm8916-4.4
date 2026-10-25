@@ -1,5 +1,14 @@
 if (ARCH_QCOM || COMPILE_TEST)
 
+config PINCTRL_MSM_TLMM
+	bool "Qualcomm MSM TLMM legacy pinctrl driver"
+	depends on OF && ARCH_QCOM
+	select PINMUX
+	select GENERIC_PINCONF
+	select PINCONF
+	help
+	  This is the legacy TLMM pinctrl driver for Qualcomm MSM8916/8939/8974.
+
 config PINCTRL_MSM
 	bool
 	select PINMUX

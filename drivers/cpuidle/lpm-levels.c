@@ -1623,8 +1623,14 @@ static int lpm_cpuidle_enter(struct cpuidle_device *dev,
 	if (need_resched())
 		goto exit;
 
-	BUG_ON(!use_psci);
-	success = psci_enter_sleep(cluster, idx, true);
+	if (!use_psci) {
+		stop_critical_timings();
+		wfi();
+		start_critical_timings();
+		success = true;
+	} else {
+		success = psci_enter_sleep(cluster, idx, true);
+	}
 
 exit:
 	end_time = ktime_to_ns(ktime_get());
@@ -1870,8 +1876,13 @@ static int lpm_suspend_enter(suspend_state_t state)
 	 */
 	clock_debug_print_enabled();
 
-	BUG_ON(!use_psci);
-	psci_enter_sleep(cluster, idx, true);
+	if (!use_psci) {
+		stop_critical_timings();
+		wfi();
+		start_critical_timings();
+	} else {
+		psci_enter_sleep(cluster, idx, true);
+	}
 
 	if (idx > 0)
 		update_debug_pc_event(CPU_EXIT, idx, true, 0xdeaffeed,
