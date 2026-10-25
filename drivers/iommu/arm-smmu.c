@@ -3820,6 +3820,7 @@ static int arm_smmu_device_cfg_probe(struct arm_smmu_device *smmu)
 	u32 id;
 	bool cttw_dt, cttw_reg;
 
+	pr_info("arm_smmu: arm_smmu_device_cfg_probe ENTER for %s\n", dev_name(smmu->dev));
 	if (arm_smmu_restore_sec_cfg(smmu))
 		return -ENODEV;
 
@@ -3827,7 +3828,9 @@ static int arm_smmu_device_cfg_probe(struct arm_smmu_device *smmu)
 	dev_dbg(smmu->dev, "SMMUv%d with:\n", smmu->version);
 
 	/* ID0 */
+	pr_info("arm_smmu: reading ID0 for %s...\n", dev_name(smmu->dev));
 	id = readl_relaxed(gr0_base + ARM_SMMU_GR0_ID0);
+	pr_info("arm_smmu: ID0=0x%x for %s\n", id, dev_name(smmu->dev));
 
 	/* Restrict available stages based on module parameter */
 	if (force_stage == 1)
@@ -4050,7 +4053,6 @@ static const struct of_device_id arm_smmu_of_match[] = {
 	{ .compatible = "arm,mmu-401", .data = (void *)ARM_SMMU_V1 },
 	{ .compatible = "arm,mmu-500", .data = (void *)ARM_SMMU_V2 },
 	{ .compatible = "qcom,smmu-v2", .data = (void *)ARM_SMMU_V2 },
-	{ .compatible = "qcom,msm-smmu-v2", .data = (void *)ARM_SMMU_V2 },
 	{ },
 };
 MODULE_DEVICE_TABLE(of, arm_smmu_of_match);
@@ -4063,6 +4065,9 @@ static int arm_smmu_device_dt_probe(struct platform_device *pdev)
 	struct device *dev = &pdev->dev;
 	struct rb_node *node;
 	int num_irqs, i, err;
+
+	pr_info("arm_smmu: probe ENTER for %s (node=%s)\n",
+		dev_name(dev), dev->of_node ? dev->of_node->name : "none");
 
 	smmu = devm_kzalloc(dev, sizeof(*smmu), GFP_KERNEL);
 	if (!smmu) {
@@ -4144,27 +4149,43 @@ static int arm_smmu_device_dt_probe(struct platform_device *pdev)
 
 	parse_driver_options(smmu);
 
-	err = arm_smmu_enable_clocks(smmu);
-	if (err)
+	err = arm_smmu_enable_regulators(smmu);
+	if (err) {
+		pr_err("arm_smmu: enable_regulators failed: %d\n", err);
 		goto out;
+	}
+
+	err = arm_smmu_enable_clocks(smmu);
+	if (err) {
+		pr_err("arm_smmu: enable_clocks failed: %d\n", err);
+		arm_smmu_disable_regulators(smmu);
+		goto out;
+	}
 
 	/* No probe deferral occurred! Proceed with iommu property parsing. */
 	smmu->masters = RB_ROOT;
 	err = arm_smmu_parse_iommus_properties(smmu);
-	if (err)
+	if (err) {
+		pr_err("arm_smmu: parse_iommus_properties failed: %d\n", err);
+		arm_smmu_disable_clocks(smmu);
+		arm_smmu_disable_regulators(smmu);
 		goto out_put_masters;
+	}
 
 	smmu->sec_id = msm_dev_to_device_id(dev);
+	pr_info("arm_smmu: calling arm_smmu_device_cfg_probe for %s\n", dev_name(dev));
 	err = arm_smmu_device_cfg_probe(smmu);
 	if (!err)
 		err = arm_smmu_init_static_cbndx_list(smmu);
 
 	arm_smmu_disable_clocks(smmu);
-	if (err)
+	arm_smmu_disable_regulators(smmu);
+	if (err) {
+		pr_err("arm_smmu: arm_smmu_device_cfg_probe failed: %d\n", err);
 		goto out_put_masters;
+	}
 
-	if (of_device_is_compatible(dev->of_node, "qcom,smmu-v2") ||
-	    of_device_is_compatible(dev->of_node, "qcom,msm-smmu-v2"))
+	if (of_device_is_compatible(dev->of_node, "qcom,smmu-v2"))
 		smmu->model = SMMU_MODEL_QCOM_V2;
 
 	if (smmu->version > ARM_SMMU_V1 &&

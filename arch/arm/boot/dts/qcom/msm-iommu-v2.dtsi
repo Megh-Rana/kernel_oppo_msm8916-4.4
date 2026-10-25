@@ -18,11 +18,15 @@
 		qcom,dynamic;
 		qcom,register-save;
 		qcom,skip-init;
+		qcom,no-smr-check;
 		#global-interrupts = <2>;
 		interrupts = <0 43 0>, <0 42 0>, <0 241 0>, <0 242 0>;
+		vdd-supply = <&gdsc_oxili_gx>;
 		clocks = <&clock_gcc clk_gcc_smmu_cfg_clk>,
-			 <&clock_gcc clk_gcc_gfx_tcu_clk>;
-		clock-names = "iface_clk", "core_clk";
+			 <&clock_gcc clk_gcc_gfx_tcu_clk>,
+			 <&clock_gcc clk_gcc_gtcu_ahb_clk>,
+			 <&clock_gcc clk_gcc_gfx_tbu_clk>;
+		clock-names = "iface_clk", "core_clk", "gtcu_iface_clk", "gtbu_clk";
 		status = "disabled";
 	};
 
