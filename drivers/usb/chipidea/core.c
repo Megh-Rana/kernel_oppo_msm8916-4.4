@@ -813,9 +813,13 @@ struct platform_device *ci_hdrc_add_device(struct device *dev,
 	}
 
 	pdev->dev.parent = dev;
-	pdev->dev.dma_mask = dev->dma_mask;
+	pdev->dev.dma_mask = dev->dma_mask ? dev->dma_mask : &pdev->dev.coherent_dma_mask;
 	pdev->dev.dma_parms = dev->dma_parms;
-	dma_set_coherent_mask(&pdev->dev, dev->coherent_dma_mask);
+	dma_set_coherent_mask(&pdev->dev, dev->coherent_dma_mask ? dev->coherent_dma_mask : DMA_BIT_MASK(32));
+	if (dev->archdata.dma_ops)
+		pdev->dev.archdata.dma_ops = dev->archdata.dma_ops;
+	else
+		arch_setup_dma_ops(&pdev->dev, 0, 0, NULL, false);
 
 	ret = platform_device_add_resources(pdev, res, nres);
 	if (ret)
@@ -880,15 +884,30 @@ static int ci_hdrc_probe(struct platform_device *pdev)
 	int		ret;
 	enum usb_dr_mode dr_mode;
 
-	if (!dev_get_platdata(dev)) {
+	struct ci_hdrc_platform_data *platdata = dev_get_platdata(dev);
+
+	if (!platdata) {
 		dev_err(dev, "platform data missing\n");
 		return -ENODEV;
 	}
 
 	res = platform_get_resource(pdev, IORESOURCE_MEM, 0);
-	base = devm_ioremap_resource(dev, res);
-	if (IS_ERR(base))
-		return PTR_ERR(base);
+	if (!res) {
+		dev_err(dev, "missing resource\n");
+		return -ENODEV;
+	}
+
+	if (platdata->flags & CI_HDRC_REGS_SHARED) {
+		base = devm_ioremap(dev, res->start, resource_size(res));
+		if (!base) {
+			dev_err(dev, "failed to ioremap shared regs\n");
+			return -ENOMEM;
+		}
+	} else {
+		base = devm_ioremap_resource(dev, res);
+		if (IS_ERR(base))
+			return PTR_ERR(base);
+	}
 
 	ci = devm_kzalloc(dev, sizeof(*ci), GFP_KERNEL);
 	if (!ci)
@@ -955,6 +974,12 @@ static int ci_hdrc_probe(struct platform_device *pdev)
 	ci_get_otg_capable(ci);
 
 	dr_mode = ci->platdata->dr_mode;
+	if (dr_mode == USB_DR_MODE_UNKNOWN) {
+		if (dev->parent && dev->parent->of_node)
+			dr_mode = usb_get_dr_mode(dev->parent);
+		if (dr_mode == USB_DR_MODE_UNKNOWN)
+			dr_mode = USB_DR_MODE_PERIPHERAL;
+	}
 	/* initialize role(s) before the interrupt is requested */
 	if (dr_mode == USB_DR_MODE_OTG || dr_mode == USB_DR_MODE_HOST) {
 		ret = ci_hdrc_host_init(ci);
