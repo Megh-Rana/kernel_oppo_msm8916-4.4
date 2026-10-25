@@ -569,6 +569,15 @@
 		qcom,bus-clk-rate = <400000000 200000000 100000000>;
 	};
 
+	usb_dev: usb_ci@78d9000 {
+		compatible = "qcom,ci-hdrc";
+		reg = <0x78d9000 0x400>;
+		dr_mode = "peripheral";
+		interrupts = <0 134 0>;
+		usb-phy = <&usb_otg>;
+		status = "ok";
+	};
+
 	android_usb: android_usb@086000c8 {
 		compatible = "qcom,android-usb";
 		reg = <0x086000c8 0xc8>;

@@ -653,9 +653,24 @@ static int nommu_get_gpuaddr(struct kgsl_pagetable *pagetable,
 		struct kgsl_memdesc *memdesc)
 {
 	if (memdesc->sgt->nents > 1) {
-		WARN_ONCE(1,
-			"Attempt to map non-contiguous memory with NOMMU\n");
-		return -EINVAL;
+		struct scatterlist *s;
+		int i;
+		phys_addr_t expected = sg_phys(memdesc->sgt->sgl) + memdesc->sgt->sgl->length;
+		bool is_contig = true;
+
+		for_each_sg(sg_next(memdesc->sgt->sgl), s, memdesc->sgt->nents - 1, i) {
+			if (sg_phys(s) != expected) {
+				is_contig = false;
+				break;
+			}
+			expected += s->length;
+		}
+
+		if (!is_contig) {
+			WARN_ONCE(1,
+				"Attempt to map non-contiguous memory with NOMMU\n");
+			return -EINVAL;
+		}
 	}
 
 	memdesc->gpuaddr = (uint64_t) sg_phys(memdesc->sgt->sgl);

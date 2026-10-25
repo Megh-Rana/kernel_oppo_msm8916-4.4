@@ -74,11 +74,18 @@ static int set_input_boost_freq(const char *buf, const struct kernel_param *kp)
 	for (i = 0; i < ntokens; i += 2) {
 		if (sscanf(cp, "%u:%u", &cpu, &val) != 2)
 			return -EINVAL;
-		if (cpu > num_possible_cpus())
-			return -EINVAL;
+		if (cpu >= nr_cpu_ids || !cpu_possible(cpu)) {
+			cp = strchr(cp, ' ');
+			if (!cp)
+				break;
+			cp++;
+			continue;
+		}
 
 		per_cpu(sync_info, cpu).input_boost_freq = val;
 		cp = strchr(cp, ' ');
+		if (!cp)
+			break;
 		cp++;
 	}
 

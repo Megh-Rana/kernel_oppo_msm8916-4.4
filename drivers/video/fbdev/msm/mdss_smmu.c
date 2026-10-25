@@ -358,8 +358,8 @@ static int mdss_smmu_attach_v2(struct mdss_data_type *mdata)
 				pr_debug("iommu v2 domain[%i] attached\n", i);
 			}
 		} else {
-			pr_err("iommu device not attached for domain[%d]\n", i);
-			return -ENODEV;
+			pr_debug("iommu device not attached for domain[%d], continuing\n", i);
+			continue;
 		}
 	}
 
