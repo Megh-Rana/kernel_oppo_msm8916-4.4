@@ -122,14 +122,21 @@ static int pmic_spmi_probe(struct spmi_device *sdev)
 {
 	struct device_node *root = sdev->dev.of_node;
 	struct regmap *regmap;
+	int rc;
 
+	pr_info("pmic_spmi_probe: entered for %s\n", root ? root->full_name : "none");
 	regmap = devm_regmap_init_spmi_ext(sdev, &spmi_regmap_config);
-	if (IS_ERR(regmap))
+	if (IS_ERR(regmap)) {
+		pr_err("pmic_spmi_probe: devm_regmap_init_spmi_ext failed: %ld\n", PTR_ERR(regmap));
 		return PTR_ERR(regmap);
+	}
 
 	pmic_spmi_show_revid(regmap, &sdev->dev);
 
-	return of_platform_populate(root, NULL, NULL, &sdev->dev);
+	rc = of_platform_populate(root, NULL, NULL, &sdev->dev);
+	pr_info("pmic_spmi_probe: of_platform_populate for %s returned %d\n",
+		root ? root->full_name : "none", rc);
+	return rc;
 }
 
 static void pmic_spmi_remove(struct spmi_device *sdev)
@@ -150,7 +157,11 @@ static struct spmi_driver pmic_spmi_driver = {
 
 int __init pmic_spmi_init(void)
 {
-	return spmi_driver_register(&pmic_spmi_driver);
+	int rc;
+	pr_info("pmic_spmi_init: registering pmic-spmi driver\n");
+	rc = spmi_driver_register(&pmic_spmi_driver);
+	pr_info("pmic_spmi_init: spmi_driver_register returned %d\n", rc);
+	return rc;
 }
 arch_initcall(pmic_spmi_init);
 

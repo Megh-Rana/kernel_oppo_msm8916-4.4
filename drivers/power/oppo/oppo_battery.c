@@ -427,7 +427,7 @@ void opchg_get_tm_adc(struct opchg_charger *chip, enum qpnp_tm_state state, int 
         chip->adc_param.low_temp, chip->adc_param.high_temp,chip->charging_opchg_temp_statu);
 
 	#ifdef OPPO_USE_ADC_TM_IRQ
-    if (qpnp_adc_tm_channel_measure(chip->adc_tm_dev, &chip->adc_param)) {
+    if (chip->adc_tm_dev && qpnp_adc_tm_channel_measure(chip->adc_tm_dev, &chip->adc_param)) {
         pr_err("request ADC error\n");
     }
 	#endif
@@ -1525,10 +1525,16 @@ void opchg_check_status(struct opchg_charger *chip)
     chip->bat_temp_status = opchg_get_prop_batt_health(chip);
 	chip->batterynotify = opchg_battery_notify_check(chip);
     chip->temperature = opchg_get_prop_batt_temp(chip);
+    if (chip->temperature <= 0)
+        chip->temperature = 250;
     chip->bat_instant_vol = opchg_get_prop_battery_voltage_now(chip);
+    if (chip->bat_instant_vol < 3000000)
+        chip->bat_instant_vol = 3950000;
     chip->charging_current = opchg_get_prop_current_now(chip);//1000;
     chip->charger_vol = opchg_get_prop_charger_voltage_now(chip);
     chip->bat_volt_check_point = opchg_get_prop_batt_capacity(chip);
+    if (chip->bat_volt_check_point <= 0 || chip->bat_volt_check_point > 100)
+        chip->bat_volt_check_point = 80;
 
 	chip->charger_type = qpnp_charger_type_get(chip);
 

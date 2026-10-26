@@ -2136,6 +2136,9 @@ int32_t qpnp_vadc_read(struct qpnp_vadc_chip *vadc,
 	enum power_supply_property prop;
 	union power_supply_propval ret = {0, };
 
+	if (!vadc)
+		return -EINVAL;
+
 	if (vadc->vadc_hc) {
 		rc = qpnp_vadc_hc_read(vadc, channel, result);
 		if (rc < 0) {

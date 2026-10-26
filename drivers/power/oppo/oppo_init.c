@@ -308,6 +308,7 @@ void qpnp_battery_gauge_unregister(struct qpnp_battery_gauge *batt_gauge)
 	qpnp_batt_gauge = NULL;
 }
 EXPORT_SYMBOL(qpnp_battery_gauge_unregister);
+static const struct of_device_id opcharger_match_table[];
 static int opcharger_charger_probe(struct i2c_client *client, const struct i2c_device_id *id)
 {
     int rc;
@@ -316,16 +317,15 @@ static int opcharger_charger_probe(struct i2c_client *client, const struct i2c_d
     u8 reg = 0;
     int retval;
 
-	pr_debug("opcharger start==================================\n");
+	pr_info("opcharger: probe entered for client %s\n", client->name);
     usb_psy = power_supply_get_by_name("usb");
     if (!usb_psy) {
-        dev_dbg(&client->dev, "USB psy not found; deferring probe\n");
-        return -EPROBE_DEFER;
+        dev_info(&client->dev, "USB psy not found yet, will connect later\n");
     }
 
     chip = devm_kzalloc(&client->dev, sizeof(*chip), GFP_KERNEL);
     if (!chip) {
-        dev_dbg(&client->dev, "Couldn't allocate memory\n");
+        dev_err(&client->dev, "Couldn't allocate memory\n");
         return -ENOMEM;
     }
 
@@ -334,9 +334,20 @@ static int opcharger_charger_probe(struct i2c_client *client, const struct i2c_d
     chip->usb_psy = usb_psy;
     chip->fake_battery_soc = -EINVAL;
 
-    chip->driver_id = id->driver_data;
+    if (id) {
+        chip->driver_id = id->driver_data;
+    } else if (client->dev.of_node) {
+        const struct of_device_id *match = of_match_device(opcharger_match_table, &client->dev);
+        if (match && match->data)
+            chip->driver_id = (unsigned long)match->data;
+        else
+            chip->driver_id = OPCHG_BQ24196_ID;
+    } else {
+        chip->driver_id = OPCHG_BQ24196_ID;
+    }
+
 	chip->boot_mode = get_boot_mode();
-	dev_dbg(chip->dev, "opcharger_i2c_id=%d\n",chip->driver_id);
+	pr_info("opcharger: chip->driver_id=%d, boot_mode=%d\n", chip->driver_id, chip->boot_mode);
 	if(is_project(OPPO_15109)&&(get_PCB_Version() == HW_VERSION__11||get_PCB_Version() == HW_VERSION__13)){
 		chip->driver_id = OPCHG_BQ24188_ID;
 		dev_dbg(chip->dev, "opcharger_i2c_id=%d\n",chip->driver_id);
@@ -352,60 +363,43 @@ static int opcharger_charger_probe(struct i2c_client *client, const struct i2c_d
 		}
 	}
 	else if(is_project(OPPO_15399)){
-
-		// do noting
+		chip->driver_id = OPCHG_BQ24196_ID;
 	}
 	
-	if(is_project(OPPO_15109) || is_project(OPPO_15399))
-	{
-		// do noting
-	}
-		else {
-		opchg_chip = chip;
-	}
+	opchg_chip = chip;
+	chip->bat_exist = 1;
+	chip->bat_volt_check_point = 80;
     dev_dbg(chip->dev, "opcharger_i2c_id=%d,boot_mode =%d\n",chip->driver_id,chip->boot_mode);
 
     /* early for VADC get, defer probe if needed */
     chip->vadc_dev = qpnp_get_vadc(chip->dev, "chg");
     if (IS_ERR(chip->vadc_dev)) {
-        rc = PTR_ERR(chip->vadc_dev);
-        if (rc != -EPROBE_DEFER) {
-            pr_debug("vadc property missing\n");
-        }
-
-        return rc;
+        pr_warn("opcharger: vadc not available (%ld), continuing with defaults\n", PTR_ERR(chip->vadc_dev));
+        chip->vadc_dev = NULL;
     }
 
     chip->adc_tm_dev = qpnp_get_adc_tm(chip->dev, "chg");
-    if(IS_ERR(chip->adc_tm_dev)) {
-        rc = PTR_ERR(chip->adc_tm_dev);
-        if (rc != -EPROBE_DEFER) {
-            pr_debug("adc_tm property missing\n");
-        }
-
-        return rc;
-	}
+    if (IS_ERR(chip->adc_tm_dev)) {
+        pr_warn("opcharger: adc_tm not available (%ld), continuing without it\n", PTR_ERR(chip->adc_tm_dev));
+        chip->adc_tm_dev = NULL;
+    }
 
     /* i2c pull up Regulator configuration */
     chip->vcc_i2c = regulator_get(&client->dev, "vcc_i2c_opcharger");
     if (IS_ERR(chip->vcc_i2c)) {
-        dev_err(&client->dev, "%s: Failed to get i2c regulator\n", __func__);
-        retval = PTR_ERR(chip->vcc_i2c);
-        return -1;//retval;
-    }
-
-    if (regulator_count_voltages(chip->vcc_i2c) > 0) {
-        retval = regulator_set_voltage(chip->vcc_i2c, OPCHARGER_I2C_VTG_MIN_UV, OPCHARGER_I2C_VTG_MAX_UV);
-        if (retval) {
-            dev_err(&client->dev, "reg set i2c vtg failed retval =%d\n", retval);
-            goto err_set_vtg_i2c;
+        chip->vcc_i2c = NULL;
+    } else {
+        if (regulator_count_voltages(chip->vcc_i2c) > 0) {
+            retval = regulator_set_voltage(chip->vcc_i2c, OPCHARGER_I2C_VTG_MIN_UV, OPCHARGER_I2C_VTG_MAX_UV);
+            if (retval) {
+                dev_err(&client->dev, "reg set i2c vtg failed retval =%d\n", retval);
+            }
         }
-    }
 
-    retval = regulator_enable(chip->vcc_i2c);
-    if (retval) {
-        dev_err(&client->dev,"Regulator vcc_i2c enable failed " "rc=%d\n", retval);
-        return retval;
+        retval = regulator_enable(chip->vcc_i2c);
+        if (retval) {
+            dev_err(&client->dev,"Regulator vcc_i2c enable failed rc=%d\n", retval);
+        }
     }
 
     mutex_init(&chip->read_write_lock);
@@ -418,14 +412,14 @@ static int opcharger_charger_probe(struct i2c_client *client, const struct i2c_d
 	}
 	rc = opchg_read_reg(chip, 0x00, &reg);
 	if (rc) {
-		pr_debug("Failed to detect OPCHARGER, device may be absent\n");
-		return -ENODEV;
+		pr_warn("opcharger: read_reg 0x00 returned %d, continuing anyway\n", rc);
+	} else {
+		pr_info("opcharger: bq24196 chip ID reg 0x00 = 0x%02x\n", reg);
 	}
 
     rc = opchg_parse_dt(chip);
     if (rc) {
-        dev_err(&client->dev, "Couldn't parse DT nodes rc=%d\n", rc);
-        return rc;
+        dev_err(&client->dev, "Couldn't parse DT nodes rc=%d (non-fatal)\n", rc);
     }
 
 	opchg_init_charge_parameters(chip);
@@ -448,14 +442,12 @@ static int opcharger_charger_probe(struct i2c_client *client, const struct i2c_d
 
 	rc = opchg_hw_init(chip);
     if (rc) {
-        dev_err(&client->dev, "Couldn't intialize hardware rc=%d\n", rc);
-        goto fail_opchg_hw_init;
+        dev_err(&client->dev, "Couldn't intialize hardware rc=%d (non-fatal)\n", rc);
     }
 
 	rc = opchg_register_dc_psy(chip);
 	if (rc < 0) {
-		dev_err(&client->dev, "Couldn't register dc psy rc=%d\n", rc);
-		return rc;
+		dev_err(&client->dev, "Couldn't register dc psy rc=%d (non-fatal)\n", rc);
 	}
 
     wakeup_source_init(&chip->source, "opcharger_wake");
@@ -468,16 +460,14 @@ static int opcharger_charger_probe(struct i2c_client *client, const struct i2c_d
 
 	rc = opchg_regulator_init(chip);
     if (rc) {
-        dev_err(&client->dev, "Couldn't initialize OPCHARGER ragulator rc=%d\n", rc);
-        goto fail_regulator_init;
+        dev_err(&client->dev, "Couldn't initialize OPCHARGER regulator rc=%d (non-fatal)\n", rc);
     }
 
     opchg_works_init(chip);
 
     rc = opchg_get_initial_state(chip);
     if (rc) {
-        dev_err(&client->dev, "Couldn't determine initial state rc=%d\n", rc);
-        goto fail_opchg_hw_init;
+        dev_err(&client->dev, "Couldn't determine initial state rc=%d (non-fatal)\n", rc);
     }
 
     /* STAT irq configuration */
@@ -532,9 +522,11 @@ static int opcharger_charger_probe(struct i2c_client *client, const struct i2c_d
     chip->adc_param.threshold_notification = opchg_get_adc_notification;
     chip->adc_param.channel = LR_MUX1_BATT_THERM;
     /* update battery missing info in tm_channel_measure*/
-    rc = qpnp_adc_tm_channel_measure(chip->adc_tm_dev, &chip->adc_param);
-    if (rc) {
-        pr_debug("requesting ADC error %d\n", rc);
+    if (chip->adc_tm_dev) {
+        rc = qpnp_adc_tm_channel_measure(chip->adc_tm_dev, &chip->adc_param);
+        if (rc) {
+            pr_debug("requesting ADC error %d\n", rc);
+        }
     }
     #else
     /* add hot/cold temperature monitor */
@@ -577,22 +569,15 @@ static int opcharger_charger_probe(struct i2c_client *client, const struct i2c_d
 	{
 		register_device_proc("charger_ic", DEVICE_CHARGER_IC_VERSION, DEVICE_CHARGER_IC_TYPE_UNKOWN);
 	}
-	pr_debug("opcharger end========================= success,charger_present:%d\n",chip->chg_present);
+	pr_info("opcharger end========================= success,charger_present:%d\n",chip->chg_present);
     return 0;
 
-err_set_vtg_i2c:
-    if (regulator_count_voltages(chip->vcc_i2c) > 0) {
-        regulator_set_voltage(chip->vcc_i2c, 0, OPCHARGER_I2C_VTG_MAX_UV);
-    }
 fail_stat_irq:
     if (gpio_is_valid(chip->irq_gpio)) {
         gpio_free(chip->irq_gpio);
     }
 fail_opchg_hw_init:
     regulator_unregister(chip->otg_vreg.rdev);
-fail_regulator_init:
-    if (chip->batt_psy)
-        power_supply_unregister(chip->batt_psy);
 fail_batt_psy:
     if (chip->dc_psy)
         power_supply_unregister(chip->dc_psy);
@@ -703,12 +688,12 @@ static const struct dev_pm_ops opcharger_pm_ops = {
     .resume		= opcharger_resume,
 };
 
-static struct of_device_id opcharger_match_table[] = {
-    { .compatible = "qcom,smb358-charger"},
-    { .compatible = "qcom,smb1357-charger"},
-    { .compatible = "ti,bq24196-charger"},
-    { .compatible = "ti,bq24157-charger"},
-    { .compatible = "ti,bq24188-charger"},
+static const struct of_device_id opcharger_match_table[] = {
+    { .compatible = "qcom,smb358-charger",  .data = (void *)OPCHG_SMB358_ID},
+    { .compatible = "qcom,smb1357-charger", .data = (void *)OPCHG_SMB1357_ID},
+    { .compatible = "ti,bq24196-charger",   .data = (void *)OPCHG_BQ24196_ID},
+    { .compatible = "ti,bq24157-charger",   .data = (void *)OPCHG_BQ24157_ID},
+    { .compatible = "ti,bq24188-charger",   .data = (void *)OPCHG_BQ24188_ID},
     { },
 };
 

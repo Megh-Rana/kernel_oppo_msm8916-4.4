@@ -21,6 +21,9 @@ int opchg_get_prop_charger_voltage_now(struct opchg_charger *chip)
     int V_charger = 0;
     struct qpnp_vadc_result results;
 
+    if (!chip || !chip->vadc_dev)
+        return 5000;
+
 	switch (chip->driver_id) {
 	  case OPCHG_SMB358_ID:
 			{
@@ -49,7 +52,7 @@ int opchg_get_prop_charger_voltage_now(struct opchg_charger *chip)
 				rc = qpnp_vadc_read(chip->vadc_dev, USBIN, &results);
 			    if (rc) {
 			        pr_err("Unable to read vchg rc=%d\n", rc);
-			        return 0;
+			        return 5000;
 			    }
 			    V_charger = (int)results.physical/1000;
 				V_charger = V_charger * 2 ;			
@@ -107,6 +110,9 @@ int opchg_get_prop_low_battery_voltage(struct opchg_charger *chip)
 	int64_t mpp_uV= 0;
 	int V_low_battery = 0;
 	struct qpnp_vadc_result results;
+
+	if (!chip || !chip->vadc_dev)
+		return 0;
 
 	switch (chip->driver_id) {
 	  case OPCHG_SMB358_ID:
@@ -168,10 +174,13 @@ int opchg_get_prop_battery_id_voltage(struct opchg_charger *chip)
 	int rc = 0;
 	struct qpnp_vadc_result results;
 
+	if (!chip || !chip->vadc_dev)
+		return 1000;
+
 	rc = qpnp_vadc_read(chip->vadc_dev, P_MUX4_1_1, &results);
 	if (rc) {
 		pr_err("Unable to read vbattery_id rc=%d\n", rc);
-		return -EPROBE_DEFER;
+		return 1000;
 	}
 
 	return ((int)results.physical/1000);
@@ -183,12 +192,15 @@ int opchg_get_prop_battery_voltage_now(struct opchg_charger *chip)
 	struct qpnp_vadc_result results;
 	int V_battery = 0;
 
+	if (!chip || !chip->vadc_dev)
+		return 3950000;
+
 	if(is_project(OPPO_15109) || is_project(OPPO_15399))
 	        {
 		rc = qpnp_vadc_read(chip->vadc_dev, VBAT_SNS, &results);
 		if (rc) {
 			pr_err("Unable to read vbat rc=%d\n", rc);
-			return 0;
+			return 3950000;
 		}
 		V_battery =(int)results.physical;
 
@@ -229,12 +241,15 @@ int opchg_get_prop_batt_temp(struct opchg_charger *chip)
 	struct qpnp_vadc_result results;
 	int T_battery = 0;
 
+	if (!chip || !chip->vadc_dev)
+		return 250;
+
 	if(is_project(OPPO_15109) || is_project(OPPO_15399))
 	        {
 		rc = qpnp_vadc_read(chip->vadc_dev, LR_MUX1_BATT_THERM, &results);
 		if (rc) {
 			pr_err("Unable to read batt temperature rc=%d\n", rc);
-			return 0;
+			return 250;
 		}
 		T_battery = (int)results.physical;
  		T_battery = T_battery - 100; /* temperature conpensation for 15399 */		

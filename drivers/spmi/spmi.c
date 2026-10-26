@@ -458,6 +458,9 @@ static void of_spmi_register_devices(struct spmi_controller *ctrl)
 	struct device_node *node;
 	int err;
 
+	pr_info("of_spmi_register_devices: ENTER ctrl->dev.of_node=%s\n",
+		ctrl->dev.of_node ? ctrl->dev.of_node->full_name : "NULL");
+
 	if (!ctrl->dev.of_node)
 		return;
 
@@ -465,31 +468,28 @@ static void of_spmi_register_devices(struct spmi_controller *ctrl)
 		struct spmi_device *sdev;
 		u32 reg[2];
 
-		dev_dbg(&ctrl->dev, "adding child %s\n", node->full_name);
+		pr_info("of_spmi_register_devices: child=%s\n", node->full_name);
 
 		err = of_property_read_u32_array(node, "reg", reg, 2);
 		if (err) {
-			dev_err(&ctrl->dev,
-				"node %s err (%d) does not have 'reg' property\n",
+			pr_err("of_spmi_register_devices: %s err (%d) does not have 'reg'\n",
 				node->full_name, err);
 			continue;
 		}
 
 		if (reg[1] != SPMI_USID) {
-			dev_err(&ctrl->dev,
-				"node %s contains unsupported 'reg' entry\n",
-				node->full_name);
+			pr_err("of_spmi_register_devices: %s contains unsupported 'reg' entry: reg[0]=%u, reg[1]=%u\n",
+				node->full_name, reg[0], reg[1]);
 			continue;
 		}
 
 		if (reg[0] >= SPMI_MAX_SLAVE_ID) {
-			dev_err(&ctrl->dev,
-				"invalid usid on node %s\n",
-				node->full_name);
+			pr_err("of_spmi_register_devices: invalid usid on node %s: %u\n",
+				node->full_name, reg[0]);
 			continue;
 		}
 
-		dev_dbg(&ctrl->dev, "read usid %02x\n", reg[0]);
+		pr_info("of_spmi_register_devices: read usid %02x for %s\n", reg[0], node->full_name);
 
 		sdev = spmi_device_alloc(ctrl);
 		if (!sdev)
@@ -499,6 +499,7 @@ static void of_spmi_register_devices(struct spmi_controller *ctrl)
 		sdev->usid = (u8) reg[0];
 
 		err = spmi_device_add(sdev);
+		pr_info("of_spmi_register_devices: spmi_device_add returned %d for %s\n", err, node->full_name);
 		if (err) {
 			dev_err(&sdev->dev,
 				"failure adding device. status %d\n", err);

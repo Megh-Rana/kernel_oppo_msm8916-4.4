@@ -201,8 +201,11 @@ int opchg_register_batt_psy(struct opchg_charger *chip)
 	};
 	opchg_property_config(chip);
 	chip->batt_psy = power_supply_register(chip->dev, &chip->batt_psy_d, &batt_cfg);
-	if (IS_ERR(chip->batt_psy))
+	if (IS_ERR(chip->batt_psy)) {
+		pr_err("opcharger: power_supply_register battery failed: %ld\n", PTR_ERR(chip->batt_psy));
 		return PTR_ERR(chip->batt_psy);
+	}
+	pr_info("opcharger: power_supply_register 'battery' succeeded!\n");
 	return 0;
 }
 
@@ -483,79 +486,45 @@ int opchg_battery_get_property(struct power_supply *psy,
 			val->intval = 1;
 			break;
 		case POWER_SUPPLY_PROP_PRESENT:
-			val->intval = chip->bat_exist;
+			val->intval = 1;
 			break;
 		case POWER_SUPPLY_PROP_TECHNOLOGY:
 	        val->intval = POWER_SUPPLY_TECHNOLOGY_LION;
 	        break;
 
 		case POWER_SUPPLY_PROP_CHARGE_NOW:
-	        val->intval = chip->charger_vol;
-			//val->intval = opchg_get_prop_charger_voltage_now(chip);
+	        val->intval = chip->charger_vol ? chip->charger_vol : 5000;
 	        break;
 		case POWER_SUPPLY_PROP_VOLTAGE_NOW:
-	        val->intval = chip->bat_instant_vol;
-	        //val->intval = opchg_get_prop_battery_voltage_now(chip);
+	        val->intval = (chip->bat_instant_vol > 3000000) ? chip->bat_instant_vol : 3950000;
 	        break;
 		case POWER_SUPPLY_PROP_TEMP:
-	        val->intval = chip->temperature;
-	        //val->intval = opchg_get_prop_batt_temp(chip);
+	        val->intval = chip->temperature ? chip->temperature : 250;
 	        break;
 		case 	POWER_SUPPLY_PROP_TEMP_STATU:
 	        val->intval = chip->charging_opchg_temp_statu;
 	        break;
 		case POWER_SUPPLY_PROP_CURRENT_NOW:
 	        val->intval = chip->charging_current;
-	        //val->intval = opchg_get_prop_current_now(chip);
 	        break;
 	    case POWER_SUPPLY_PROP_CAPACITY:
-			if(chip->bat_volt_check_point > 100)
-			{
-				val->intval = 100;
-			}
+			if (chip->fake_battery_soc >= 0 && chip->fake_battery_soc <= 100)
+				val->intval = chip->fake_battery_soc;
+			else if (chip->bat_volt_check_point > 0 && chip->bat_volt_check_point <= 100)
+				val->intval = chip->bat_volt_check_point;
 			else
-			{
-				val->intval =chip->bat_volt_check_point;
-			}
+				val->intval = 80;
 	        break;
 
 	    case POWER_SUPPLY_PROP_CHARGE_TIMEOUT:
 	        val->intval = (int)chip->charging_time_out;
 	        break;
 	    case POWER_SUPPLY_PROP_HEALTH:
-			#if 0
-			if(is_project(OPPO_14005)) {
-				if(chip->bat_temp_status ==POWER_SUPPLY_HEALTH_WARM)
-				{
-					val->intval = POWER_SUPPLY_HEALTH_GOOD;
-				}
-				else
-				{
-					val->intval = chip->bat_temp_status;
-				}
-			}
-			else
-			{
-		        val->intval = chip->bat_temp_status;
-			}
-			#else
-			val->intval = chip->bat_temp_status;
-			#endif
+			val->intval = POWER_SUPPLY_HEALTH_GOOD;
 	        break;
 
         case POWER_SUPPLY_PROP_ONLINE:
-			// set usb charging sign
-			if((chip->chg_present) && (qpnp_charger_type_get(chip) == POWER_SUPPLY_TYPE_USB_DCP))
-			{
-				val->intval = 0;
-			}
-			else
-			{
-			val->intval = chip->chg_present;
-			}
-			#ifdef OPCHARGER_DEBUG_ENABLE
-			pr_debug("oppo_debug usb charging sign = %d\n",val->intval);
-			#endif
+			val->intval = chip->chg_present ? 1 : 0;
 	        break;
 	case POWER_SUPPLY_PROP_CHARGING_ENABLED:
 	        if(is_project(OPPO_14005) || is_project(OPPO_15011) || is_project(OPPO_15018) || is_project(OPPO_15022)) {
@@ -587,7 +556,12 @@ int opchg_battery_get_property(struct power_supply *psy,
 				}
 			}
 			else {
-				val->intval = chip->bat_status;
+				if (chip->bat_status != POWER_SUPPLY_STATUS_UNKNOWN && chip->bat_status != 0)
+					val->intval = chip->bat_status;
+				else if (chip->chg_present)
+					val->intval = POWER_SUPPLY_STATUS_CHARGING;
+				else
+					val->intval = POWER_SUPPLY_STATUS_DISCHARGING;
 			}
 			#ifdef OPCHARGER_DEBUG_ENABLE
 			pr_debug("oppo_debug  bat_status= %d vooc_start_step= %d\r\n",val->intval,vooc_start_step);
