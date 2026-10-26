@@ -2628,7 +2628,9 @@ static int __ffs_data_got_descs(struct ffs_data *ffs,
 			      FUNCTIONFS_HAS_SS_DESC |
 			      FUNCTIONFS_HAS_MS_OS_DESC |
 			      FUNCTIONFS_VIRTUAL_ADDR |
-			      FUNCTIONFS_EVENTFD)) {
+			      FUNCTIONFS_EVENTFD |
+			      FUNCTIONFS_ALL_CTRL_RECIP |
+			      FUNCTIONFS_CONFIG0_SETUP)) {
 			ret = -ENOSYS;
 			goto error;
 		}
@@ -3569,7 +3571,10 @@ static int ffs_func_setup(struct usb_function *f,
 		break;
 
 	default:
-		return -EOPNOTSUPP;
+		if (func->ffs->user_flags & FUNCTIONFS_ALL_CTRL_RECIP)
+			ret = le16_to_cpu(creq->wIndex);
+		else
+			return -EOPNOTSUPP;
 	}
 
 	spin_lock_irqsave(&ffs->ev.waitq.lock, flags);
