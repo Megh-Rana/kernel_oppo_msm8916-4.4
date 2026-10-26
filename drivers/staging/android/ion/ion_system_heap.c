@@ -16,6 +16,7 @@
  */
 
 #include <asm/page.h>
+#include <asm/cacheflush.h>
 #include <linux/dma-mapping.h>
 #include <linux/err.h>
 #include <linux/highmem.h>
@@ -28,6 +29,7 @@
 #include "ion.h"
 #include "ion_priv.h"
 #include <linux/dma-mapping.h>
+#include <linux/dma-contiguous.h>
 #include <trace/events/kmem.h>
 #include <soc/qcom/secure_buffer.h>
 
@@ -372,6 +374,45 @@ static int ion_system_heap_allocate(struct ion_heap *heap,
 	if (size / PAGE_SIZE > totalram_pages / 2)
 		return -ENOMEM;
 
+#ifdef CONFIG_DMA_CMA
+	if (size > PAGE_SIZE && !is_secure_vmid_valid(vmid)) {
+		unsigned long nr_pages = PAGE_ALIGN(size) >> PAGE_SHIFT;
+		struct page *cma_page = dma_alloc_from_contiguous(NULL, nr_pages, 0);
+
+		if (cma_page) {
+			int p;
+			void *kaddr;
+
+			table = kzalloc(sizeof(struct sg_table), GFP_KERNEL);
+			if (!table) {
+				dma_release_from_contiguous(NULL, cma_page, nr_pages);
+				return -ENOMEM;
+			}
+			ret = sg_alloc_table(table, 1, GFP_KERNEL);
+			if (ret) {
+				kfree(table);
+				dma_release_from_contiguous(NULL, cma_page, nr_pages);
+				return ret;
+			}
+			sg_set_page(table->sgl, cma_page, PAGE_ALIGN(size), 0);
+			sg_dma_address(table->sgl) = page_to_phys(cma_page);
+
+			kaddr = page_address(cma_page);
+			if (kaddr) {
+				memset(kaddr, 0, PAGE_ALIGN(size));
+				__dma_flush_range(kaddr, kaddr + PAGE_ALIGN(size));
+			} else {
+				for (p = 0; p < nr_pages; p++)
+					clear_highpage(nth_page(cma_page, p));
+			}
+
+			buffer->priv_virt = table;
+			buffer->private_flags |= ION_PRIV_FLAG_CMA;
+			return 0;
+		}
+	}
+#endif
+
 	data.size = 0;
 	INIT_LIST_HEAD(&pages);
 	INIT_LIST_HEAD(&pages_from_pool);
@@ -520,6 +561,18 @@ void ion_system_heap_free(struct ion_buffer *buffer)
 	int i;
 	int vmid = get_secure_vmid(buffer->flags);
 	struct device *dev = heap->priv;
+
+#ifdef CONFIG_DMA_CMA
+	if (buffer->private_flags & ION_PRIV_FLAG_CMA) {
+		struct page *page = sg_page(table->sgl);
+		unsigned long count = PAGE_ALIGN(buffer->size) >> PAGE_SHIFT;
+
+		dma_release_from_contiguous(NULL, page, count);
+		sg_free_table(table);
+		kfree(table);
+		return;
+	}
+#endif
 
 	if (!(buffer->private_flags & ION_PRIV_FLAG_SHRINKER_FREE) &&
 	    !(buffer->flags & ION_FLAG_POOL_FORCE_ALLOC)) {

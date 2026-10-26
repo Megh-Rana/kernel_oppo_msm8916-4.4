@@ -681,7 +681,9 @@ static int a3xx_send_me_init(struct adreno_device *adreno_dev,
 	*cmds++ = 0x00000000;
 	*cmds++ = 0x00000000;
 
+	pr_info("a3xx_send_me_init: submitting CP_ME_INIT with spin timeout 2000ms\n");
 	ret = adreno_ringbuffer_submit_spin(rb, NULL, 2000);
+	pr_info("a3xx_send_me_init: submit_spin ret=%d\n", ret);
 	if (ret) {
 		struct kgsl_device *device = KGSL_DEVICE(adreno_dev);
 
@@ -697,6 +699,8 @@ static int a3xx_rb_start(struct adreno_device *adreno_dev,
 {
 	struct adreno_ringbuffer *rb = ADRENO_CURRENT_RINGBUFFER(adreno_dev);
 	int ret;
+
+	pr_info("a3xx_rb_start: start_type=%d rb->id=%d\n", start_type, rb->id);
 
 	/*
 	 * The size of the ringbuffer in the hardware is the log2
@@ -1341,11 +1345,15 @@ static void a3xx_start(struct adreno_device *adreno_dev)
 	struct kgsl_device *device = KGSL_DEVICE(adreno_dev);
 	struct adreno_gpudev *gpudev = ADRENO_GPU_DEVICE(adreno_dev);
 
+	pr_info("a3xx_start: 1. vbif_start...\n");
 	adreno_vbif_start(adreno_dev, a3xx_vbif_platforms,
 			ARRAY_SIZE(a3xx_vbif_platforms));
+	pr_info("a3xx_start: 1. vbif_start done\n");
 
+	pr_info("a3xx_start: 2. regwrite RBBM_GPU_BUSY_MASKED...\n");
 	/* Make all blocks contribute to the GPU BUSY perf counter */
 	kgsl_regwrite(device, A3XX_RBBM_GPU_BUSY_MASKED, 0xFFFFFFFF);
+	pr_info("a3xx_start: 2. regwrite RBBM_GPU_BUSY_MASKED done\n");
 
 	/* Tune the hystersis counters for SP and CP idle detection */
 	kgsl_regwrite(device, A3XX_RBBM_SP_HYST_CNT, 0x10);

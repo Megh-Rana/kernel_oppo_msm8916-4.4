@@ -367,11 +367,15 @@ static int _attach_pt(struct kgsl_iommu_pt *iommu_pt,
 {
 	int ret;
 
+	pr_info("_attach_pt: ENTER iommu_pt->attached=%d\n", iommu_pt->attached);
 	if (iommu_pt->attached)
 		return 0;
 
 	_iommu_sync_mmu_pc(true);
+	pr_info("_attach_pt: calling iommu_attach_device(domain=%p, dev=%p)\n",
+		iommu_pt->domain, ctx->dev);
 	ret = iommu_attach_device(iommu_pt->domain, ctx->dev);
+	pr_info("_attach_pt: iommu_attach_device ret=%d\n", ret);
 	_iommu_sync_mmu_pc(false);
 
 	if (ret == 0)
@@ -984,6 +988,12 @@ static void kgsl_iommu_disable_clk(struct kgsl_mmu *mmu)
 	for (j = (KGSL_IOMMU_MAX_CLKS - 1); j >= 0; j--)
 		if (iommu->clks[j])
 			clk_disable_unprepare(iommu->clks[j]);
+
+	if (mmu->defaultpagetable && mmu->defaultpagetable->priv) {
+		struct kgsl_iommu_pt *pt = mmu->defaultpagetable->priv;
+		if (pt->domain)
+			iommu_disable_config_clocks(pt->domain);
+	}
 }
 
 /*
@@ -1012,6 +1022,12 @@ static void kgsl_iommu_enable_clk(struct kgsl_mmu *mmu)
 {
 	int j;
 	struct kgsl_iommu *iommu = _IOMMU_PRIV(mmu);
+
+	if (mmu->defaultpagetable && mmu->defaultpagetable->priv) {
+		struct kgsl_iommu_pt *pt = mmu->defaultpagetable->priv;
+		if (pt->domain)
+			iommu_enable_config_clocks(pt->domain);
+	}
 
 	for (j = 0; j < KGSL_IOMMU_MAX_CLKS; j++) {
 		if (iommu->clks[j])
@@ -1217,7 +1233,9 @@ static int _init_global_pt(struct kgsl_mmu *mmu, struct kgsl_pagetable *pt)
 	struct kgsl_iommu *iommu = _IOMMU_PRIV(mmu);
 	struct kgsl_iommu_context *ctx = &iommu->ctx[KGSL_IOMMU_CONTEXT_USER];
 
+	pr_info("_init_global_pt: ENTER pt=%p ctx->dev=%p\n", pt, ctx->dev);
 	iommu_pt = _alloc_pt(ctx->dev, mmu, pt);
+	pr_info("_init_global_pt: _alloc_pt returned %p\n", iommu_pt);
 
 	if (IS_ERR(iommu_pt))
 		return PTR_ERR(iommu_pt);
@@ -1232,7 +1250,9 @@ static int _init_global_pt(struct kgsl_mmu *mmu, struct kgsl_pagetable *pt)
 		}
 	}
 
+	pr_info("_init_global_pt: calling _attach_pt(iommu_pt=%p, ctx=%p)...\n", iommu_pt, ctx);
 	ret = _attach_pt(iommu_pt, ctx);
+	pr_info("_init_global_pt: _attach_pt returned %d\n", ret);
 	if (ret)
 		goto done;
 
@@ -1250,6 +1270,7 @@ static int _init_global_pt(struct kgsl_mmu *mmu, struct kgsl_pagetable *pt)
 	ctx->cb_num = cb_num;
 	ctx->regbase = iommu->regbase + KGSL_IOMMU_CB0_OFFSET
 			+ (cb_num << KGSL_IOMMU_CB_SHIFT);
+	pr_info("_init_global_pt: cb_num=%u, ctx->regbase=%p\n", cb_num, ctx->regbase);
 
 	ret = iommu_domain_get_attr(iommu_pt->domain,
 			DOMAIN_ATTR_TTBR0, &iommu_pt->ttbr0);
@@ -1266,12 +1287,15 @@ static int _init_global_pt(struct kgsl_mmu *mmu, struct kgsl_pagetable *pt)
 		goto done;
 	}
 
+	pr_info("_init_global_pt: calling kgsl_iommu_map_globals...\n");
 	ret = kgsl_iommu_map_globals(pt);
+	pr_info("_init_global_pt: kgsl_iommu_map_globals ret=%d\n", ret);
 
 done:
 	if (ret)
 		_free_pt(ctx, pt);
 
+	pr_info("_init_global_pt: EXIT ret=%d\n", ret);
 	return ret;
 }
 
@@ -1582,9 +1606,12 @@ static int _setup_user_context(struct kgsl_mmu *mmu)
 	struct kgsl_iommu_pt *iommu_pt = NULL;
 	unsigned int  sctlr_val;
 
+	pr_info("_setup_user_context: ENTER defaultpagetable=%p\n", mmu->defaultpagetable);
 	if (mmu->defaultpagetable == NULL) {
+		pr_info("_setup_user_context: calling kgsl_mmu_getpagetable(GLOBAL_PT)...\n");
 		mmu->defaultpagetable = kgsl_mmu_getpagetable(mmu,
 				KGSL_MMU_GLOBAL_PT);
+		pr_info("_setup_user_context: kgsl_mmu_getpagetable returned %p\n", mmu->defaultpagetable);
 		/* if we don't have a default pagetable, nothing will work */
 		if (IS_ERR(mmu->defaultpagetable)) {
 			ret = PTR_ERR(mmu->defaultpagetable);
@@ -1599,15 +1626,20 @@ static int _setup_user_context(struct kgsl_mmu *mmu)
 	if (iommu_pt == NULL)
 		return -ENODEV;
 
+	pr_info("_setup_user_context: calling _attach_pt(iommu_pt=%p, ctx=%p)...\n", iommu_pt, ctx);
 	ret = _attach_pt(iommu_pt, ctx);
+	pr_info("_setup_user_context: _attach_pt returned %d\n", ret);
 	if (ret)
 		return ret;
 
 	ctx->default_pt = mmu->defaultpagetable;
 
+	pr_info("_setup_user_context: calling kgsl_iommu_enable_clk...\n");
 	kgsl_iommu_enable_clk(mmu);
 
+	pr_info("_setup_user_context: reading SCTLR at ctx->regbase=%p...\n", ctx->regbase);
 	sctlr_val = KGSL_IOMMU_GET_CTX_REG(ctx, SCTLR);
+	pr_info("_setup_user_context: SCTLR=0x%x\n", sctlr_val);
 
 	/*
 	 * If pagefault policy is GPUHALT_ENABLE,
@@ -1620,7 +1652,6 @@ static int _setup_user_context(struct kgsl_mmu *mmu)
 	 *    independently of any outstanding fault)
 	 */
 
-	sctlr_val = KGSL_IOMMU_GET_CTX_REG(ctx, SCTLR);
 	if (test_bit(KGSL_FT_PAGEFAULT_GPUHALT_ENABLE,
 				&adreno_dev->ft_pf_policy)) {
 		sctlr_val |= (0x1 << KGSL_IOMMU_SCTLR_CFCFG_SHIFT);
@@ -1629,8 +1660,11 @@ static int _setup_user_context(struct kgsl_mmu *mmu)
 		sctlr_val &= ~(0x1 << KGSL_IOMMU_SCTLR_CFCFG_SHIFT);
 		sctlr_val |= (0x1 << KGSL_IOMMU_SCTLR_HUPCF_SHIFT);
 	}
+	pr_info("_setup_user_context: writing SCTLR=0x%x...\n", sctlr_val);
 	KGSL_IOMMU_SET_CTX_REG(ctx, SCTLR, sctlr_val);
+	pr_info("_setup_user_context: calling kgsl_iommu_disable_clk...\n");
 	kgsl_iommu_disable_clk(mmu);
+	pr_info("_setup_user_context: done!\n");
 
 	return 0;
 }
@@ -1686,18 +1720,24 @@ static int kgsl_iommu_start(struct kgsl_mmu *mmu)
 	int status;
 	struct kgsl_iommu *iommu = _IOMMU_PRIV(mmu);
 
+	pr_info("kgsl_iommu_start: 1. _setup_user_context...\n");
 	status = _setup_user_context(mmu);
+	pr_info("kgsl_iommu_start: 1. _setup_user_context status=%d\n", status);
 	if (status)
 		return status;
 
+	pr_info("kgsl_iommu_start: 2. _setup_secure_context...\n");
 	status = _setup_secure_context(mmu);
+	pr_info("kgsl_iommu_start: 2. _setup_secure_context status=%d\n", status);
 	if (status) {
 		_detach_context(&iommu->ctx[KGSL_IOMMU_CONTEXT_USER]);
 		return status;
 	}
 
-	/* Make sure the hardware is programmed to the default pagetable */
-	return kgsl_iommu_set_pt(mmu, mmu->defaultpagetable);
+	pr_info("kgsl_iommu_start: 3. kgsl_iommu_set_pt...\n");
+	status = kgsl_iommu_set_pt(mmu, mmu->defaultpagetable);
+	pr_info("kgsl_iommu_start: 3. kgsl_iommu_set_pt status=%d\n", status);
+	return status;
 }
 
 static int
@@ -2084,10 +2124,12 @@ static int kgsl_iommu_set_pt(struct kgsl_mmu *mmu, struct kgsl_pagetable *pt)
 	if ((pt != mmu->defaultpagetable) && !kgsl_mmu_is_perprocess(mmu))
 		return 0;
 
+	pr_info("kgsl_iommu_set_pt: ENTER pt=%p, default=%p\n", pt, mmu->defaultpagetable);
 	kgsl_iommu_enable_clk(mmu);
 
 	ttbr0 = kgsl_mmu_pagetable_get_ttbr0(pt);
 	contextidr = kgsl_mmu_pagetable_get_contextidr(pt);
+	pr_info("kgsl_iommu_set_pt: ttbr0=0x%llx contextidr=0x%x\n", (unsigned long long)ttbr0, contextidr);
 
 	KGSL_IOMMU_SET_CTX_REG_Q(ctx, TTBR0, ttbr0);
 	KGSL_IOMMU_SET_CTX_REG(ctx, CONTEXTIDR, contextidr);

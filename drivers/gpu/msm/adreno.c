@@ -1195,25 +1195,35 @@ static int adreno_init(struct kgsl_device *device)
 	 * available or the microcode was corrupted. Fail the init and force
 	 * the user to try the open() again
 	 */
-
+	pr_info("adreno_init: calling microcode_read\n");
 	ret = gpudev->microcode_read(adreno_dev);
-	if (ret)
+	if (ret) {
+		pr_err("adreno_init: microcode_read failed: %d\n", ret);
 		return ret;
+	}
+	pr_info("adreno_init: microcode_read ok, changing state to AWARE\n");
 
 	/* Put the GPU in a responsive state */
 	ret = kgsl_pwrctrl_change_state(device, KGSL_STATE_AWARE);
-	if (ret)
+	if (ret) {
+		pr_err("adreno_init: kgsl_pwrctrl_change_state(AWARE) failed: %d\n", ret);
 		return ret;
+	}
+	pr_info("adreno_init: state is AWARE, calling adreno_iommu_init\n");
 
 	ret = adreno_iommu_init(adreno_dev);
-	if (ret)
+	if (ret) {
+		pr_err("adreno_init: adreno_iommu_init failed: %d\n", ret);
 		return ret;
+	}
+	pr_info("adreno_init: adreno_iommu_init ok\n");
 
 	adreno_perfcounter_init(adreno_dev);
 	adreno_fault_detect_init(adreno_dev);
 
 	/* Power down the device */
 	kgsl_pwrctrl_change_state(device, KGSL_STATE_INIT);
+	pr_info("adreno_init: complete!\n");
 
 	if (gpudev->init != NULL)
 		gpudev->init(adreno_dev);
@@ -1335,6 +1345,8 @@ static int _adreno_start(struct adreno_device *adreno_dev)
 	/* make sure ADRENO_DEVICE_STARTED is not set here */
 	BUG_ON(test_bit(ADRENO_DEVICE_STARTED, &adreno_dev->priv));
 
+	pr_info("_adreno_start: ENTER (state=%d)\n", state);
+
 	/* disallow l2pc during wake up to improve GPU wake up time */
 	kgsl_pwrctrl_update_l2pc(&adreno_dev->dev,
 			KGSL_L2PC_WAKEUP_TIMEOUT);
@@ -1349,27 +1361,39 @@ static int _adreno_start(struct adreno_device *adreno_dev)
 	/* Clear any GPU faults that might have been left over */
 	adreno_clear_gpu_fault(adreno_dev);
 
+	pr_info("_adreno_start: step 1: kgsl_pwrctrl_change_state(AWARE)...\n");
 	/* Put the GPU in a responsive state */
 	status = kgsl_pwrctrl_change_state(device, KGSL_STATE_AWARE);
+	pr_info("_adreno_start: step 1 done, status=%d\n", status);
 	if (status)
 		goto error_pwr_off;
 
 	/* Set the bit to indicate that we've just powered on */
 	set_bit(ADRENO_DEVICE_PWRON, &adreno_dev->priv);
 
+	pr_info("_adreno_start: step 2: regulator_left_on=%d\n", regulator_left_on);
 	/* Soft reset the GPU if a regulator is stuck on*/
-	if (regulator_left_on)
+	if (regulator_left_on) {
+		pr_info("_adreno_start: step 2a: calling _soft_reset\n");
 		_soft_reset(adreno_dev);
+		pr_info("_adreno_start: step 2a: _soft_reset done\n");
+	}
 
+	pr_info("_adreno_start: step 3: adreno_ringbuffer_set_global\n");
 	adreno_ringbuffer_set_global(adreno_dev, 0);
 
+	pr_info("_adreno_start: step 4: calling kgsl_mmu_start\n");
 	status = kgsl_mmu_start(device);
+	pr_info("_adreno_start: step 4 done, status=%d\n", status);
 	if (status)
 		goto error_pwr_off;
 
+	pr_info("_adreno_start: step 5: _set_secvid\n");
 	_set_secvid(device);
 
+	pr_info("_adreno_start: step 6: adreno_ocmem_malloc\n");
 	status = adreno_ocmem_malloc(adreno_dev);
+	pr_info("_adreno_start: step 6 done, status=%d\n", status);
 	if (status) {
 		KGSL_DRV_ERR(device, "OCMEM malloc failed\n");
 		goto error_mmu_off;
@@ -1379,6 +1403,8 @@ static int _adreno_start(struct adreno_device *adreno_dev)
 	if (gpudev->enable_64bit &&
 			adreno_support_64bit(adreno_dev))
 		gpudev->enable_64bit(adreno_dev);
+
+	pr_info("_adreno_start: step 7: perfcounter_get\n");
 
 	if (adreno_dev->perfctr_pwr_lo == 0) {
 		ret = adreno_perfcounter_get(adreno_dev,
@@ -1435,6 +1461,7 @@ static int _adreno_start(struct adreno_device *adreno_dev)
 
 	/* Start the GPU */
 	gpudev->start(adreno_dev);
+	pr_info("_adreno_start: gpudev->start done\n");
 
 	/* Re-initialize the coresight registers if applicable */
 	adreno_coresight_start(adreno_dev);
@@ -1446,7 +1473,9 @@ static int _adreno_start(struct adreno_device *adreno_dev)
 	/* Clear FSR here in case it is set from a previous pagefault */
 	kgsl_mmu_clear_fsr(&device->mmu);
 
+	pr_info("_adreno_start: calling adreno_ringbuffer_start\n");
 	status = adreno_ringbuffer_start(adreno_dev, ADRENO_START_COLD);
+	pr_info("_adreno_start: adreno_ringbuffer_start status=%d\n", status);
 	if (status)
 		goto error_mmu_off;
 
@@ -1456,6 +1485,7 @@ static int _adreno_start(struct adreno_device *adreno_dev)
 	device->reset_counter++;
 
 	set_bit(ADRENO_DEVICE_STARTED, &adreno_dev->priv);
+	pr_info("_adreno_start: SUCCESS!\n");
 
 	if (pmqos_active_vote != pmqos_wakeup_vote)
 		pm_qos_update_request(&device->pwrctrl.pm_qos_req_dma,

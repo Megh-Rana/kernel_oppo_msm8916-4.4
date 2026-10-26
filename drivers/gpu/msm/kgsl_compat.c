@@ -390,6 +390,11 @@ long kgsl_compat_ioctl(struct file *filep, unsigned int cmd, unsigned long arg)
 {
 	struct kgsl_device_private *dev_priv = filep->private_data;
 	struct kgsl_device *device = dev_priv->device;
+	static int count = 0;
+
+	if (count++ < 30)
+		pr_info("kgsl_compat_ioctl: cmd=0x%08X by %s (pid %d)\n",
+			cmd, current->comm, current->pid);
 
 	long ret = kgsl_ioctl_helper(filep, cmd, arg, kgsl_compat_ioctl_funcs,
 		ARRAY_SIZE(kgsl_compat_ioctl_funcs));

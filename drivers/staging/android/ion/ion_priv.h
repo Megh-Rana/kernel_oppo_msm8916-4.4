@@ -156,6 +156,7 @@ struct ion_heap_ops {
  * returned to the system allocator.
  */
 #define ION_PRIV_FLAG_SHRINKER_FREE (1 << 0)
+#define ION_PRIV_FLAG_CMA (1 << 1)
 
 /**
  * struct ion_heap - represents a heap in the system
