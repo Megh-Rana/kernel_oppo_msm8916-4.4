@@ -35,6 +35,7 @@
 #include <linux/of_device.h>
 #include <linux/reboot.h>
 #include <linux/reset.h>
+#include <linux/power_supply.h>
 
 #include <linux/usb.h>
 #include <linux/usb/otg.h>
@@ -257,6 +258,33 @@ static int msm_phy_notify_disconnect(struct usb_phy *phy,
 	val = ulpi_read(phy, ULPI_FUNC_CTRL);
 	val &= ~ULPI_FUNC_CTRL_OPMODE_MASK;
 	val |= ULPI_FUNC_CTRL_OPMODE_NONDRIVING;
+	ulpi_write(phy, val, ULPI_FUNC_CTRL);
+
+	return 0;
+}
+
+static int msm_phy_notify_connect(struct usb_phy *phy,
+				   enum usb_device_speed speed)
+{
+	struct msm_otg *motg = container_of(phy, struct msm_otg, phy);
+	int val;
+
+	if (motg->manual_pullup) {
+		val = ULPI_MISC_A_VBUSVLDEXTSEL | ULPI_MISC_A_VBUSVLDEXT;
+		ulpi_write(phy, val, ULPI_SET(ULPI_MISC_A));
+
+		val = readl(USB_GENCONFIG_2);
+		val |= GENCONFIG_2_SESS_VLD_CTRL_EN;
+		writel(val, USB_GENCONFIG_2);
+
+		val = readl(USB_USBCMD);
+		val |= USBCMD_SESS_VLD_CTRL;
+		writel(val, USB_USBCMD);
+	}
+
+	val = ulpi_read(phy, ULPI_FUNC_CTRL);
+	val &= ~ULPI_FUNC_CTRL_OPMODE_MASK;
+	val |= ULPI_FUNC_CTRL_OPMODE_NORMAL;
 	ulpi_write(phy, val, ULPI_FUNC_CTRL);
 
 	return 0;
@@ -807,6 +835,8 @@ static void msm_otg_start_peripheral(struct usb_phy *phy, int on)
 			pdata->setup_gpio(OTG_STATE_UNDEFINED);
 	}
 
+	if (motg->usb_psy)
+		power_supply_changed(motg->usb_psy);
 }
 
 static int msm_otg_set_peripheral(struct usb_otg *otg,
@@ -1258,8 +1288,9 @@ static void msm_otg_sm_work(struct work_struct *w)
 		break;
 	case OTG_STATE_B_PERIPHERAL:
 		dev_dbg(otg->usb_phy->dev, "OTG_STATE_B_PERIPHERAL state\n");
-		if (!test_bit(B_SESS_VLD, &motg->inputs) ||
-				!test_bit(ID, &motg->inputs)) {
+		if (motg->pdata->mode != USB_DR_MODE_PERIPHERAL &&
+		    (!test_bit(B_SESS_VLD, &motg->inputs) ||
+		     !test_bit(ID, &motg->inputs))) {
 			msm_otg_notify_charger(motg, 0);
 			msm_otg_start_peripheral(otg->usb_phy, 0);
 			motg->chg_state = USB_CHG_STATE_UNDEFINED;
@@ -1310,7 +1341,7 @@ static irqreturn_t msm_otg_irq(int irq, void *data)
 	} else if ((otgsc & OTGSC_BSVIS) && (otgsc & OTGSC_BSVIE)) {
 		if (otgsc & OTGSC_BSV)
 			set_bit(B_SESS_VLD, &motg->inputs);
-		else
+		else if (motg->pdata->mode != USB_DR_MODE_PERIPHERAL)
 			clear_bit(B_SESS_VLD, &motg->inputs);
 		dev_dbg(phy->dev, "BSV set/clear\n");
 		pm_runtime_get_noresume(phy->dev);
@@ -1508,6 +1539,74 @@ static int msm_otg_id_notifier(struct notifier_block *nb, unsigned long event,
 
 	return NOTIFY_DONE;
 }
+
+static enum power_supply_property msm_usb_power_props[] = {
+	POWER_SUPPLY_PROP_PRESENT,
+	POWER_SUPPLY_PROP_ONLINE,
+	POWER_SUPPLY_PROP_CURRENT_MAX,
+	POWER_SUPPLY_PROP_TYPE,
+	POWER_SUPPLY_PROP_HEALTH,
+};
+
+static int msm_usb_power_get_property(struct power_supply *psy,
+				      enum power_supply_property psp,
+				      union power_supply_propval *val)
+{
+	struct msm_otg *motg = power_supply_get_drvdata(psy);
+
+	switch (psp) {
+	case POWER_SUPPLY_PROP_PRESENT:
+		val->intval = test_bit(B_SESS_VLD, &motg->inputs) ? 1 : 0;
+		break;
+	case POWER_SUPPLY_PROP_ONLINE:
+		val->intval = (motg->phy.otg && motg->phy.otg->state == OTG_STATE_B_PERIPHERAL) ? 1 : 0;
+		break;
+	case POWER_SUPPLY_PROP_CURRENT_MAX:
+		val->intval = 500000;
+		break;
+	case POWER_SUPPLY_PROP_TYPE:
+		val->intval = POWER_SUPPLY_TYPE_USB;
+		break;
+	case POWER_SUPPLY_PROP_HEALTH:
+		val->intval = POWER_SUPPLY_HEALTH_GOOD;
+		break;
+	default:
+		return -EINVAL;
+	}
+	return 0;
+}
+
+static int msm_usb_power_set_property(struct power_supply *psy,
+				      enum power_supply_property psp,
+				      const union power_supply_propval *val)
+{
+	return 0;
+}
+
+static int msm_usb_power_property_is_writeable(struct power_supply *psy,
+					       enum power_supply_property psp)
+{
+	switch (psp) {
+	case POWER_SUPPLY_PROP_PRESENT:
+	case POWER_SUPPLY_PROP_ONLINE:
+	case POWER_SUPPLY_PROP_CURRENT_MAX:
+	case POWER_SUPPLY_PROP_TYPE:
+	case POWER_SUPPLY_PROP_HEALTH:
+		return 1;
+	default:
+		return 0;
+	}
+}
+
+static const struct power_supply_desc msm_usb_power_supply_desc = {
+	.name = "usb",
+	.type = POWER_SUPPLY_TYPE_USB,
+	.properties = msm_usb_power_props,
+	.num_properties = ARRAY_SIZE(msm_usb_power_props),
+	.get_property = msm_usb_power_get_property,
+	.set_property = msm_usb_power_set_property,
+	.property_is_writeable = msm_usb_power_property_is_writeable,
+};
 
 static int msm_otg_read_dt(struct platform_device *pdev, struct msm_otg *motg)
 {
@@ -1863,6 +1962,7 @@ static int msm_otg_probe(struct platform_device *pdev)
 
 	phy->init = msm_phy_init;
 	phy->set_power = msm_otg_set_power;
+	phy->notify_connect = msm_phy_notify_connect;
 	phy->notify_disconnect = msm_phy_notify_disconnect;
 	phy->type = USB_PHY_TYPE_USB2;
 
@@ -1896,6 +1996,22 @@ static int msm_otg_probe(struct platform_device *pdev)
 	} else {
 		/* Switch D+/D- lines to Hub */
 		gpiod_set_value_cansleep(motg->switch_gpio, 1);
+	}
+
+	{
+		struct power_supply_config psy_cfg = {
+			.drv_data = motg,
+			.of_node = pdev->dev.of_node,
+		};
+
+		motg->usb_psy = devm_power_supply_register(&pdev->dev,
+							   &msm_usb_power_supply_desc,
+							   &psy_cfg);
+		if (IS_ERR(motg->usb_psy))
+			dev_warn(&pdev->dev, "failed to register usb power supply: %ld\n",
+				 PTR_ERR(motg->usb_psy));
+		else
+			dev_info(&pdev->dev, "registered 'usb' power supply successfully\n");
 	}
 
 	motg->reboot.notifier_call = msm_otg_reboot_notify;

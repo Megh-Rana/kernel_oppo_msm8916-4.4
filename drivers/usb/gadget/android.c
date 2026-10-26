@@ -798,8 +798,8 @@ static void android_disconnect(struct usb_composite_dev *cdev)
 {
 	struct android_dev *dev = g_android_dev;
 
-	pr_info("android_usb: disconnect\n");
-	if (dev) {
+	if (dev && dev->connected) {
+		pr_info("android_usb: disconnect\n");
 		dev->connected = false;
 		schedule_work(&dev->work);
 	}

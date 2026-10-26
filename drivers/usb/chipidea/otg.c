@@ -136,8 +136,10 @@ void ci_handle_vbus_change(struct ci_hdrc *ci)
 
 	if (hw_read_otgsc(ci, OTGSC_BSV) && !ci->vbus_active)
 		usb_gadget_vbus_connect(&ci->gadget);
-	else if (!hw_read_otgsc(ci, OTGSC_BSV) && ci->vbus_active)
-		usb_gadget_vbus_disconnect(&ci->gadget);
+	else if (!hw_read_otgsc(ci, OTGSC_BSV) && ci->vbus_active) {
+		if (ci->platdata->dr_mode != USB_DR_MODE_PERIPHERAL)
+			usb_gadget_vbus_disconnect(&ci->gadget);
+	}
 }
 
 /**

@@ -47,7 +47,8 @@ static struct ci_hdrc_platform_data ci_hdrc_msm_platdata = {
 	.capoffset		= DEF_CAPOFFSET,
 	.dr_mode		= USB_DR_MODE_PERIPHERAL,
 	.flags			= CI_HDRC_REGS_SHARED |
-				  CI_HDRC_DISABLE_STREAMING,
+				  CI_HDRC_DISABLE_STREAMING |
+				  CI_HDRC_DUAL_ROLE_NOT_OTG,
 
 	.notify_event		= ci_hdrc_msm_notify_event,
 };

@@ -1530,8 +1530,7 @@ static int ci_udc_vbus_session(struct usb_gadget *_gadget, int is_active)
 			usb_udc_vbus_handler(_gadget, true);
 		} else {
 			usb_udc_vbus_handler(_gadget, false);
-			if (ci->driver)
-				ci->driver->disconnect(&ci->gadget);
+			/* usb_udc_vbus_handler already calls driver->disconnect */
 			hw_device_state(ci, 0);
 			if (ci->platdata->notify_event)
 				ci->platdata->notify_event(ci,
@@ -1595,23 +1594,36 @@ static int ci_udc_pullup(struct usb_gadget *_gadget, int is_on)
 {
 	struct ci_hdrc *ci = container_of(_gadget, struct ci_hdrc, gadget);
 
-	/*
-	 * Data+ pullup controlled by OTG state machine in OTG fsm mode;
-	 * and don't touch Data+ in host mode for dual role config.
-	 */
 	if (ci_otg_is_fsm_mode(ci) || ci->role == CI_ROLE_HOST)
 		return 0;
 
-	if (ci->usb_phy)
-		pm_runtime_get_sync(ci->usb_phy->dev);
-	pm_runtime_get_sync(&ci->gadget.dev);
-	if (is_on)
+	pr_info("ci_udc_pullup: is_on=%d\n", is_on);
+
+	if (is_on) {
+		if (ci->usb_phy) {
+			usb_phy_io_write(ci->usb_phy,
+				0x03, /* ULPI_MISC_A_VBUSVLDEXT | ULPI_MISC_A_VBUSVLDEXTSEL */
+				0x96 | 0x40); /* ULPI_SET(ULPI_MISC_A) */
+			usb_phy_io_write(ci->usb_phy,
+				0x18, /* OPMODE bits */
+				0x04 | 0x80); /* ULPI_CLR(ULPI_FUNC_CTRL) -> normal opmode */
+		}
+		hw_write_id_reg(ci, 0x00a0, (1 << 7), (1 << 7)); /* GENCFG2_SESS_VLD_CTRL_EN */
+		hw_write_id_reg(ci, 0x0140, (1 << 25), (1 << 25)); /* USBCMD_SESS_VLD_CTRL (BIT 25) */
+		mb();
+
 		hw_write(ci, OP_USBCMD, USBCMD_RS, USBCMD_RS);
-	else
+	} else {
 		hw_write(ci, OP_USBCMD, USBCMD_RS, 0);
-	pm_runtime_put_sync(&ci->gadget.dev);
-	if (ci->usb_phy && !is_on)
-		pm_runtime_put(ci->usb_phy->dev);
+		hw_write_id_reg(ci, 0x0140, (1 << 25), 0); /* clear USBCMD_SESS_VLD_CTRL */
+		mb();
+		if (ci->usb_phy) {
+			usb_phy_io_write(ci->usb_phy,
+				0x03,
+				0x96 | 0x80); /* ULPI_CLR(ULPI_MISC_A) */
+			usb_phy_notify_disconnect(ci->usb_phy, ci->gadget.speed);
+		}
+	}
 
 	return 0;
 }
@@ -1771,17 +1783,13 @@ static int ci_udc_start(struct usb_gadget *gadget,
 	}
 
 	pm_runtime_get_sync(&ci->gadget.dev);
-	if (ci->vbus_active) {
-		spin_lock_irqsave(&ci->lock, flags);
-		hw_device_reset(ci);
-	} else {
-		usb_udc_vbus_handler(&ci->gadget, false);
-		pm_runtime_put_sync(&ci->gadget.dev);
-		return retval;
-	}
-
+	ci->vbus_active = 1;
+	spin_lock_irqsave(&ci->lock, flags);
+	hw_device_reset(ci);
 	retval = hw_device_state(ci, ci->ep0out->qh.dma);
 	spin_unlock_irqrestore(&ci->lock, flags);
+	usb_udc_vbus_handler(&ci->gadget, true);
+
 	if (retval)
 		pm_runtime_put_sync(&ci->gadget.dev);
 
@@ -1811,6 +1819,9 @@ static int ci_udc_stop(struct usb_gadget *gadget)
 {
 	struct ci_hdrc *ci = container_of(gadget, struct ci_hdrc, gadget);
 	unsigned long flags;
+
+	if (hw_read(ci, OP_USBCMD, USBCMD_RS))
+		ci_udc_pullup(gadget, 0);
 
 	spin_lock_irqsave(&ci->lock, flags);
 
