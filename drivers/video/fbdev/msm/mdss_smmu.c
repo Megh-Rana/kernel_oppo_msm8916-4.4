@@ -438,12 +438,15 @@ static struct dma_buf_attachment *mdss_smmu_dma_buf_attach_v2(
 		struct dma_buf *dma_buf, struct device *dev, int domain)
 {
 	struct mdss_smmu_client *mdss_smmu = mdss_smmu_get_cb(domain);
-	if (!mdss_smmu) {
-		pr_err("not able to get smmu context\n");
-		return NULL;
+	struct device *attach_dev = (mdss_smmu && mdss_smmu->base.dev) ?
+				    mdss_smmu->base.dev : dev;
+
+	if (!attach_dev) {
+		pr_err("not able to get smmu context or dev for domain %d\n", domain);
+		return ERR_PTR(-ENODEV);
 	}
 
-	return dma_buf_attach(dma_buf, mdss_smmu->base.dev);
+	return dma_buf_attach(dma_buf, attach_dev);
 }
 
 /*
@@ -459,12 +462,11 @@ static int mdss_smmu_map_dma_buf_v2(struct dma_buf *dma_buf,
 {
 	int rc;
 	struct mdss_smmu_client *mdss_smmu = mdss_smmu_get_cb(domain);
-	if (!mdss_smmu) {
-		pr_err("not able to get smmu context\n");
-		return -EINVAL;
-	}
+	struct device *dev = (mdss_smmu && mdss_smmu->base.dev) ?
+			     mdss_smmu->base.dev : &mdss_mdp_get_mdata()->pdev->dev;
+
 	ATRACE_BEGIN("map_buffer");
-	rc = msm_dma_map_sg_lazy(mdss_smmu->base.dev, table->sgl, table->nents,
+	rc = msm_dma_map_sg_lazy(dev, table->sgl, table->nents,
 				 dir, dma_buf);
 	if (rc != table->nents) {
 		pr_err("dma map sg failed\n");
@@ -480,13 +482,11 @@ static void mdss_smmu_unmap_dma_buf_v2(struct sg_table *table, int domain,
 		int dir, struct dma_buf *dma_buf)
 {
 	struct mdss_smmu_client *mdss_smmu = mdss_smmu_get_cb(domain);
-	if (!mdss_smmu) {
-		pr_err("not able to get smmu context\n");
-		return;
-	}
+	struct device *dev = (mdss_smmu && mdss_smmu->base.dev) ?
+			     mdss_smmu->base.dev : &mdss_mdp_get_mdata()->pdev->dev;
 
 	ATRACE_BEGIN("unmap_buffer");
-	msm_dma_unmap_sg(mdss_smmu->base.dev, table->sgl, table->nents, dir,
+	msm_dma_unmap_sg(dev, table->sgl, table->nents, dir,
 		 dma_buf);
 	ATRACE_END("unmap_buffer");
 }
@@ -503,17 +503,18 @@ static int mdss_smmu_dma_alloc_coherent_v2(struct device *dev, size_t size,
 		gfp_t gfp, int domain)
 {
 	struct mdss_smmu_client *mdss_smmu = mdss_smmu_get_cb(domain);
-	if (!mdss_smmu) {
-		pr_err("not able to get smmu context\n");
-		return -EINVAL;
-	}
+	struct device *alloc_dev = (mdss_smmu && mdss_smmu->base.dev) ?
+				   mdss_smmu->base.dev : dev;
 
-	*cpu_addr = dma_alloc_coherent(mdss_smmu->base.dev, size, iova, gfp);
+	if (!alloc_dev)
+		alloc_dev = &mdss_mdp_get_mdata()->pdev->dev;
+
+	*cpu_addr = dma_alloc_coherent(alloc_dev, size, iova, gfp);
 	if (!*cpu_addr) {
 		pr_err("dma alloc coherent failed!\n");
 		return -ENOMEM;
 	}
-	if (mdss_smmu->mmu_mapping && mdss_smmu->mmu_mapping->domain)
+	if (mdss_smmu && mdss_smmu->mmu_mapping && mdss_smmu->mmu_mapping->domain)
 		*phys = iommu_iova_to_phys(mdss_smmu->mmu_mapping->domain,
 				*iova);
 	else
@@ -525,12 +526,13 @@ static void mdss_smmu_dma_free_coherent_v2(struct device *dev, size_t size,
 		void *cpu_addr, dma_addr_t phys, dma_addr_t iova, int domain)
 {
 	struct mdss_smmu_client *mdss_smmu = mdss_smmu_get_cb(domain);
-	if (!mdss_smmu) {
-		pr_err("not able to get smmu context\n");
-		return;
-	}
+	struct device *free_dev = (mdss_smmu && mdss_smmu->base.dev) ?
+				  mdss_smmu->base.dev : dev;
 
-	dma_free_coherent(mdss_smmu->base.dev, size, cpu_addr, iova);
+	if (!free_dev)
+		free_dev = &mdss_mdp_get_mdata()->pdev->dev;
+
+	dma_free_coherent(free_dev, size, cpu_addr, iova);
 }
 
 /*
