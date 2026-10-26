@@ -43,6 +43,7 @@ struct android_dev {
 
 	bool enabled;
 	bool connected;
+	bool config_added;
 	struct mutex mutex;
 	struct work_struct work;
 
@@ -299,42 +300,34 @@ static int android_bind_config(struct usb_configuration *c)
 static void android_clean_functions(struct android_dev *dev)
 {
 	if (dev->f_ffs) {
-		usb_remove_function(&android_config_driver, dev->f_ffs);
 		usb_put_function(dev->f_ffs);
 		dev->f_ffs = NULL;
 	}
 	if (dev->f_mtp) {
-		usb_remove_function(&android_config_driver, dev->f_mtp);
 		usb_put_function(dev->f_mtp);
 		dev->f_mtp = NULL;
 	}
 	if (dev->f_ptp) {
-		usb_remove_function(&android_config_driver, dev->f_ptp);
 		usb_put_function(dev->f_ptp);
 		dev->f_ptp = NULL;
 	}
 	if (dev->f_ms) {
-		usb_remove_function(&android_config_driver, dev->f_ms);
 		usb_put_function(dev->f_ms);
 		dev->f_ms = NULL;
 	}
 	if (dev->f_acc) {
-		usb_remove_function(&android_config_driver, dev->f_acc);
 		usb_put_function(dev->f_acc);
 		dev->f_acc = NULL;
 	}
 	if (dev->f_audio) {
-		usb_remove_function(&android_config_driver, dev->f_audio);
 		usb_put_function(dev->f_audio);
 		dev->f_audio = NULL;
 	}
 	if (dev->f_midi) {
-		usb_remove_function(&android_config_driver, dev->f_midi);
 		usb_put_function(dev->f_midi);
 		dev->f_midi = NULL;
 	}
 	if (dev->f_rndis) {
-		usb_remove_function(&android_config_driver, dev->f_rndis);
 		usb_put_function(dev->f_rndis);
 		dev->f_rndis = NULL;
 	}
@@ -360,11 +353,12 @@ static int android_enable(struct android_dev *dev)
 		return 0;
 	}
 
-	if (dev->enabled) {
+	if (dev->config_added) {
 		if (cdev->gadget)
 			usb_gadget_disconnect(cdev->gadget);
-		android_clean_functions(dev);
 		usb_remove_config(cdev, &android_config_driver);
+		android_clean_functions(dev);
+		dev->config_added = false;
 	}
 
 	pr_info("android_usb: enabling '%s', VID=0x%04x PID=0x%04x\n",
@@ -388,6 +382,7 @@ static int android_enable(struct android_dev *dev)
 		return ret;
 	}
 
+	dev->config_added = true;
 	usb_gadget_connect(cdev->gadget);
 	dev->enabled = true;
 	dev->connected = true;
@@ -408,9 +403,11 @@ static void android_disable(struct android_dev *dev)
 	if (cdev && cdev->gadget)
 		usb_gadget_disconnect(cdev->gadget);
 
-	android_clean_functions(dev);
-	if (cdev)
+	if (dev->config_added) {
 		usb_remove_config(cdev, &android_config_driver);
+		android_clean_functions(dev);
+		dev->config_added = false;
+	}
 
 	dev->enabled = false;
 	dev->connected = false;
