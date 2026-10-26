@@ -2135,12 +2135,16 @@ int kgsl_pwrctrl_init(struct kgsl_device *device)
 	struct platform_device *p2dev;
 
 	bus_scale_table = msm_bus_cl_get_pdata(device->pdev);
-	if (bus_scale_table == NULL)
+	if (bus_scale_table == NULL) {
+		pr_err("kgsl_pwrctrl_init: msm_bus_cl_get_pdata returned NULL\n");
 		return -EINVAL;
+	}
 
 	result = _get_clocks(device);
-	if (result)
+	if (result) {
+		pr_err("kgsl_pwrctrl_init: _get_clocks failed: %d\n", result);
 		goto error_cleanup_clks;
+	}
 
 	/* Make sure we have a source clk for freq setting */
 	if (pwr->grp_clks[0] == NULL)
@@ -2249,6 +2253,7 @@ int kgsl_pwrctrl_init(struct kgsl_device *device)
 		 */
 		pwr->pcl = msm_bus_scale_register_client(bus_scale_table);
 		if (pwr->pcl == 0) {
+			pr_err("kgsl_pwrctrl_init: msm_bus_scale_register_client returned 0\n");
 			result = -EINVAL;
 			goto error_cleanup_ocmem_pcl;
 		}

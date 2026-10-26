@@ -4758,7 +4758,10 @@ int kgsl_device_platform_probe(struct kgsl_device *device)
 	struct resource *res;
 	int cpu;
 
+	pr_err("kgsl_device_platform_probe: ENTER dev=%s\n", device->name);
+
 	status = _register_device(device);
+	pr_err("kgsl_device_platform_probe: _register_device status=%d\n", status);
 	if (status)
 		return status;
 
@@ -4769,6 +4772,7 @@ int kgsl_device_platform_probe(struct kgsl_device *device)
 	device->flags &= ~KGSL_FLAG_SPARSE;
 
 	status = kgsl_pwrctrl_init(device);
+	pr_err("kgsl_device_platform_probe: kgsl_pwrctrl_init status=%d\n", status);
 	if (status)
 		goto error;
 
@@ -4776,13 +4780,13 @@ int kgsl_device_platform_probe(struct kgsl_device *device)
 	res = platform_get_resource_byname(device->pdev, IORESOURCE_MEM,
 					   device->iomemname);
 	if (res == NULL) {
-		KGSL_DRV_ERR(device, "platform_get_resource_byname failed\n");
+		pr_err("kgsl_device_platform_probe: platform_get_resource_byname failed for %s\n",
+			device->iomemname);
 		status = -EINVAL;
 		goto error_pwrctrl_close;
 	}
 	if (res->start == 0 || resource_size(res) == 0) {
-		KGSL_DRV_ERR(device, "dev %d invalid register region\n",
-			device->id);
+		pr_err("kgsl_device_platform_probe: invalid reg region for %d\n", device->id);
 		status = -EINVAL;
 		goto error_pwrctrl_close;
 	}
@@ -4819,7 +4823,7 @@ int kgsl_device_platform_probe(struct kgsl_device *device)
 
 	if (!devm_request_mem_region(device->dev, device->reg_phys,
 				device->reg_len, device->name)) {
-		KGSL_DRV_ERR(device, "request_mem_region failed\n");
+		pr_err("kgsl_device_platform_probe: request_mem_region failed\n");
 		status = -ENODEV;
 		goto error_pwrctrl_close;
 	}
@@ -4828,7 +4832,7 @@ int kgsl_device_platform_probe(struct kgsl_device *device)
 					device->reg_len);
 
 	if (device->reg_virt == NULL) {
-		KGSL_DRV_ERR(device, "ioremap failed\n");
+		pr_err("kgsl_device_platform_probe: ioremap failed\n");
 		status = -ENODEV;
 		goto error_pwrctrl_close;
 	}
@@ -4837,8 +4841,8 @@ int kgsl_device_platform_probe(struct kgsl_device *device)
 		platform_get_irq_byname(device->pdev, device->pwrctrl.irq_name);
 
 	if (device->pwrctrl.interrupt_num <= 0) {
-		KGSL_DRV_ERR(device, "platform_get_irq_byname failed: %d\n",
-					 device->pwrctrl.interrupt_num);
+		pr_err("kgsl_device_platform_probe: platform_get_irq_byname failed: %d\n",
+			device->pwrctrl.interrupt_num);
 		status = -EINVAL;
 		goto error_pwrctrl_close;
 	}
@@ -4847,8 +4851,7 @@ int kgsl_device_platform_probe(struct kgsl_device *device)
 				  kgsl_irq_handler, IRQF_TRIGGER_HIGH,
 				  device->name, device);
 	if (status) {
-		KGSL_DRV_ERR(device, "request_irq(%d) failed: %d\n",
-			      device->pwrctrl.interrupt_num, status);
+		pr_err("kgsl_device_platform_probe: devm_request_irq failed: %d\n", status);
 		goto error_pwrctrl_close;
 	}
 	disable_irq(device->pwrctrl.interrupt_num);
@@ -4863,11 +4866,13 @@ int kgsl_device_platform_probe(struct kgsl_device *device)
 	setup_timer(&device->idle_timer, kgsl_timer, (unsigned long) device);
 
 	status = kgsl_mmu_probe(device, kgsl_mmu_type);
+	pr_err("kgsl_device_platform_probe: kgsl_mmu_probe status=%d\n", status);
 	if (status != 0)
 		goto error_pwrctrl_close;
 
 	/* Check to see if our device can perform DMA correctly */
 	status = dma_set_coherent_mask(&device->pdev->dev, KGSL_DMA_BIT_MASK);
+	pr_err("kgsl_device_platform_probe: dma_set_coherent_mask status=%d\n", status);
 	if (status)
 		goto error_close_mmu;
 
@@ -4876,6 +4881,7 @@ int kgsl_device_platform_probe(struct kgsl_device *device)
 
 	status = kgsl_allocate_global(device, &device->memstore,
 		KGSL_MEMSTORE_SIZE, 0, KGSL_MEMDESC_CONTIG, "memstore");
+	pr_err("kgsl_device_platform_probe: kgsl_allocate_global memstore status=%d\n", status);
 
 	if (status != 0)
 		goto error_close_mmu;

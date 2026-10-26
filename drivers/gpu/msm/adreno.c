@@ -961,10 +961,12 @@ static int adreno_probe(struct platform_device *pdev)
 	struct adreno_device *adreno_dev;
 	int status;
 
+	pr_err("adreno_probe: ENTER\n");
+
 	adreno_dev = adreno_get_dev(pdev);
 
 	if (adreno_dev == NULL) {
-		pr_err("adreno: qcom,kgsl-3d0 does not exist in the device tree");
+		pr_err("adreno: qcom,kgsl-3d0 does not exist in the device tree\n");
 		return -ENODEV;
 	}
 
@@ -973,8 +975,10 @@ static int adreno_probe(struct platform_device *pdev)
 
 	/* Get the chip ID from the DT and set up target specific parameters */
 	adreno_identify_gpu(adreno_dev);
+	pr_err("adreno_probe: identify_gpu done, chipid=0x%x\n", adreno_dev->chipid);
 
 	status = adreno_of_get_power(adreno_dev, pdev);
+	pr_err("adreno_probe: of_get_power status=%d\n", status);
 	if (status) {
 		device->pdev = NULL;
 		return status;
@@ -989,6 +993,7 @@ static int adreno_probe(struct platform_device *pdev)
 		device->mmu.features |= KGSL_MMU_64BIT;
 
 	status = kgsl_device_platform_probe(device);
+	pr_err("adreno_probe: kgsl_device_platform_probe status=%d\n", status);
 	if (status) {
 		device->pdev = NULL;
 		return status;
@@ -1006,10 +1011,12 @@ static int adreno_probe(struct platform_device *pdev)
 		device->mmu.secured = false;
 
 	status = adreno_ringbuffer_probe(adreno_dev, nopreempt);
+	pr_err("adreno_probe: adreno_ringbuffer_probe status=%d\n", status);
 	if (status)
 		goto out;
 
 	status = adreno_dispatcher_init(adreno_dev);
+	pr_err("adreno_probe: adreno_dispatcher_init status=%d\n", status);
 	if (status)
 		goto out;
 
