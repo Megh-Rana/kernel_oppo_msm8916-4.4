@@ -34,6 +34,12 @@
 
 DEFINE_VDD_REGS_INIT(vdd_cpu, 1);
 
+bool clock_a7_has_vdd(void)
+{
+	return vdd_cpu.num_regulators > 0 && vdd_cpu.regulator[0] != NULL;
+}
+EXPORT_SYMBOL(clock_a7_has_vdd);
+
 static struct mux_div_clk a7ssmux = {
 	.ops = &rcg_mux_div_ops,
 	.safe_freq = 300000000,
@@ -397,9 +403,19 @@ static int clock_a7_probe(struct platform_device *pdev)
 
 	vdd_cpu.regulator[0] = devm_regulator_get(&pdev->dev, "cpu-vdd");
 	if (IS_ERR(vdd_cpu.regulator[0])) {
-		pr_err("clock-a7: devm_regulator_get(cpu-vdd) failed: %ld\n",
-			PTR_ERR(vdd_cpu.regulator[0]));
-		return PTR_ERR(vdd_cpu.regulator[0]);
+		if (PTR_ERR(vdd_cpu.regulator[0]) == -EPROBE_DEFER) {
+			static int defer_count = 0;
+			if (defer_count++ < 3) {
+				pr_info("clock-a7: devm_regulator_get(cpu-vdd) deferring (try %d)\n", defer_count);
+				return -EPROBE_DEFER;
+			}
+			pr_warn("clock-a7: devm_regulator_get(cpu-vdd) deferred too many times, proceeding without cpu-vdd regulator!\n");
+		} else {
+			pr_warn("clock-a7: devm_regulator_get(cpu-vdd) failed: %ld, proceeding without cpu-vdd regulator\n",
+				PTR_ERR(vdd_cpu.regulator[0]));
+		}
+		vdd_cpu.regulator[0] = NULL;
+		vdd_cpu.num_regulators = 0;
 	}
 
 	rc = of_get_clk_src(pdev, a7ssmux.parents);
@@ -435,6 +451,15 @@ static int clock_a7_probe(struct platform_device *pdev)
 			return rc;
 		}
 		dev_info(&pdev->dev, "Safe voltage plan loaded.\n");
+	}
+
+	if (!clock_a7_has_vdd()) {
+		int fi;
+		pr_warn("clock-a7: running without vdd_cpu; capping fmax to 533MHz for safety\n");
+		for (fi = 0; fi < a7ssmux.c.num_fmax; fi++) {
+			if (a7ssmux.c.fmax[fi] > 533330000)
+				a7ssmux.c.fmax[fi] = 533330000;
+		}
 	}
 
 	rc = of_msm_clock_register(pdev->dev.of_node,

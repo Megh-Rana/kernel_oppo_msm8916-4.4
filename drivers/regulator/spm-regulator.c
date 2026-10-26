@@ -1106,6 +1106,7 @@ static int spm_regulator_probe(struct platform_device *pdev)
 	bool bypass_spm;
 	int rc;
 
+	pr_info("spm_regulator_probe: enter for %s\n", node ? node->full_name : "none");
 	if (!node) {
 		dev_err(&pdev->dev, "%s: device node missing\n", __func__);
 		return -ENODEV;

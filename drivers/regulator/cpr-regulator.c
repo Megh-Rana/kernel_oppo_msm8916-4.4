@@ -2287,6 +2287,8 @@ static int cpr_apc_init(struct platform_device *pdev,
 	if (rc) {
 		if (rc != -EPROBE_DEFER)
 			cpr_err(cpr_vreg, "devm_regulator_get: rc=%d\n", rc);
+		else
+			cpr_info(cpr_vreg, "cpr_apc_init: vdd_apc deferring (rc=%d)\n", rc);
 		return rc;
 	}
 
@@ -2299,6 +2301,8 @@ static int cpr_apc_init(struct platform_device *pdev,
 				cpr_err(cpr_vreg,
 					"devm_regulator_get: vdd-mx: rc=%d\n",
 					rc);
+			else
+				cpr_info(cpr_vreg, "cpr_apc_init: vdd_mx deferring (rc=%d)\n", rc);
 			return rc;
 		}
 	}
@@ -5646,12 +5650,9 @@ static int cpr_mem_acc_init(struct platform_device *pdev,
 		cpr_vreg->mem_acc_vreg = devm_regulator_get(&pdev->dev,
 							"mem-acc");
 		if (IS_ERR_OR_NULL(cpr_vreg->mem_acc_vreg)) {
-			rc = PTR_RET(cpr_vreg->mem_acc_vreg);
-			if (rc != -EPROBE_DEFER)
-				cpr_err(cpr_vreg,
-					"devm_regulator_get: mem-acc: rc=%d\n",
-					rc);
-			return rc;
+			cpr_info(cpr_vreg, "mem-acc not available (%ld), continuing without it\n",
+				PTR_ERR(cpr_vreg->mem_acc_vreg));
+			cpr_vreg->mem_acc_vreg = NULL;
 		}
 	}
 

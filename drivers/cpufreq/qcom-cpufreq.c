@@ -27,6 +27,7 @@
 #include <linux/err.h>
 #include <linux/platform_device.h>
 #include <linux/of.h>
+#include <linux/of_platform.h>
 #include <trace/events/power.h>
 
 static DEFINE_MUTEX(l2bw_lock);
@@ -406,6 +407,17 @@ static int msm_cpufreq_probe(struct platform_device *pdev)
 	/* Parse commong cpufreq table for all CPUs */
 	ftbl = cpufreq_parse_dt(dev, "qcom,cpufreq-table", 0);
 	if (!IS_ERR(ftbl)) {
+		extern bool clock_a7_has_vdd(void);
+		if (!clock_a7_has_vdd()) {
+			int ti;
+			pr_warn("msm-cpufreq: voltage scaling not active, truncating cpufreq table at 533 MHz for safety\n");
+			for (ti = 0; ftbl[ti].frequency != CPUFREQ_TABLE_END; ti++) {
+				if (ftbl[ti].frequency > 533330) {
+					ftbl[ti].frequency = CPUFREQ_TABLE_END;
+					break;
+				}
+			}
+		}
 		for_each_possible_cpu(cpu)
 			per_cpu(freq_table, cpu) = ftbl;
 		goto register_driver;
@@ -476,10 +488,20 @@ static struct platform_driver msm_cpufreq_plat_driver = {
 static int __init msm_cpufreq_register(void)
 {
 	int cpu;
+	struct device_node *np;
 
 	for_each_possible_cpu(cpu) {
 		mutex_init(&(per_cpu(suspend_data, cpu).suspend_mutex));
 		per_cpu(suspend_data, cpu).device_suspended = 0;
+	}
+
+	np = of_find_compatible_node(NULL, NULL, "qcom,msm-cpufreq");
+	if (np) {
+		pr_info("msm-cpufreq: found DT node %s, creating platform device\n", np->full_name);
+		of_platform_device_create(np, NULL, NULL);
+		of_node_put(np);
+	} else {
+		pr_err("msm-cpufreq: DT node qcom,msm-cpufreq not found!\n");
 	}
 
 	return platform_driver_register(&msm_cpufreq_plat_driver);
