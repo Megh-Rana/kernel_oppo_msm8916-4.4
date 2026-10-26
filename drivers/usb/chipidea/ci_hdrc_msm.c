@@ -73,15 +73,15 @@ static int ci_hdrc_msm_probe(struct platform_device *pdev)
 
 	ci_hdrc_msm_platdata.usb_phy = phy;
 
-	/* Wake up PHY so USB clocks are running during controller probe */
+	/* Wake up PHY so USB clocks and LDOs are running */
 	pm_runtime_get_sync(phy->dev);
 
 	plat_ci = ci_hdrc_add_device(&pdev->dev,
 				pdev->resource, pdev->num_resources,
 				&ci_hdrc_msm_platdata);
-	pm_runtime_put(phy->dev);
 
 	if (IS_ERR(plat_ci)) {
+		pm_runtime_put(phy->dev);
 		pr_err("ci_hdrc_msm: ci_hdrc_add_device failed: %ld\n", PTR_ERR(plat_ci));
 		return PTR_ERR(plat_ci);
 	}

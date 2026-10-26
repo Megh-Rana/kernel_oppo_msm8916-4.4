@@ -1602,12 +1602,16 @@ static int ci_udc_pullup(struct usb_gadget *_gadget, int is_on)
 	if (ci_otg_is_fsm_mode(ci) || ci->role == CI_ROLE_HOST)
 		return 0;
 
+	if (ci->usb_phy)
+		pm_runtime_get_sync(ci->usb_phy->dev);
 	pm_runtime_get_sync(&ci->gadget.dev);
 	if (is_on)
 		hw_write(ci, OP_USBCMD, USBCMD_RS, USBCMD_RS);
 	else
 		hw_write(ci, OP_USBCMD, USBCMD_RS, 0);
 	pm_runtime_put_sync(&ci->gadget.dev);
+	if (ci->usb_phy && !is_on)
+		pm_runtime_put(ci->usb_phy->dev);
 
 	return 0;
 }
