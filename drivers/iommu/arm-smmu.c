@@ -391,6 +391,7 @@ struct arm_smmu_device {
 
 	u32				num_global_irqs;
 	u32				num_context_irqs;
+	u32				num_context_irqs_probed;
 	unsigned int			*irqs;
 
 	struct list_head		list;
@@ -1938,7 +1939,14 @@ static int arm_smmu_init_domain_context(struct iommu_domain *domain,
 	 * Request context fault interrupt. Do this last to avoid the
 	 * handler seeing a half-initialised domain state.
 	 */
-	irq = smmu->irqs[smmu->num_global_irqs + cfg->irptndx];
+	{
+		u32 ctx_irq_idx = cfg->irptndx;
+		if (smmu->num_context_irqs_probed)
+			ctx_irq_idx %= smmu->num_context_irqs_probed;
+		irq = smmu->irqs[smmu->num_global_irqs + ctx_irq_idx];
+		pr_info("arm_smmu: requesting context irq %d for cbndx %d (ctx_irq_idx=%u)\n",
+			irq, cfg->cbndx, ctx_irq_idx);
+	}
 	ret = request_threaded_irq(irq, NULL, arm_smmu_context_fault,
 				IRQF_ONESHOT | IRQF_SHARED,
 				"arm-smmu-context-fault", domain);
@@ -2190,11 +2198,19 @@ static void arm_smmu_impl_def_programming(struct arm_smmu_device *smmu)
 	int i;
 	struct arm_smmu_impl_def_reg *regs = smmu->impl_def_attach_registers;
 
+	if (!smmu->num_impl_def_attach_registers) {
+		pr_info("arm_smmu_impl_def_programming: 0 regs, skipping halt\n");
+		return;
+	}
+
+	pr_info("arm_smmu_impl_def_programming: calling arm_smmu_halt...\n");
 	arm_smmu_halt(smmu);
+	pr_info("arm_smmu_impl_def_programming: arm_smmu_halt ok, writing regs...\n");
 	for (i = 0; i < smmu->num_impl_def_attach_registers; ++i)
 		writel_relaxed(regs[i].value,
 			ARM_SMMU_GR0(smmu) + regs[i].offset);
 	arm_smmu_resume(smmu);
+	pr_info("arm_smmu_impl_def_programming: done\n");
 }
 
 static int arm_smmu_attach_dynamic(struct iommu_domain *domain,
@@ -2318,6 +2334,7 @@ static int arm_smmu_attach_dev(struct iommu_domain *domain, struct device *dev)
 	struct arm_smmu_master_cfg *cfg;
 	int atomic_ctx = smmu_domain->attributes & (1 << DOMAIN_ATTR_ATOMIC);
 
+	pr_info("arm_smmu_attach_dev: ENTER dev=%s\n", dev_name(dev));
 	mutex_lock(&smmu_domain->init_mutex);
 	smmu = find_smmu_for_device(dev);
 	if (!smmu) {
@@ -2325,8 +2342,10 @@ static int arm_smmu_attach_dev(struct iommu_domain *domain, struct device *dev)
 		mutex_unlock(&smmu_domain->init_mutex);
 		return -ENXIO;
 	}
+	pr_info("arm_smmu_attach_dev: smmu=%s\n", dev_name(smmu->dev));
 
 	if (smmu_domain->attributes & (1 << DOMAIN_ATTR_DYNAMIC)) {
+		pr_info("arm_smmu_attach_dev: dynamic domain\n");
 		ret = arm_smmu_attach_dynamic(domain, smmu);
 		mutex_unlock(&smmu_domain->init_mutex);
 		return ret;
@@ -2341,25 +2360,24 @@ static int arm_smmu_attach_dev(struct iommu_domain *domain, struct device *dev)
 	}
 
 	if (!smmu->attach_count) {
-		/*
-		 * We need an extra power vote if we can't retain register
-		 * settings across a power collapse, or if this is an
-		 * atomic domain (since atomic domains can't sleep during
-		 * unmap, so regulators already need to be on to enable tlb
-		 * invalidation).  The result (due to regulator
-		 * refcounting) is that we never disable regulators while a
-		 * client is attached in these cases.
-		 */
+		pr_info("arm_smmu_attach_dev: first attach (attach_count=0)\n");
 		if (!(smmu->options & ARM_SMMU_OPT_REGISTER_SAVE)) {
+			pr_info("arm_smmu_attach_dev: calling arm_smmu_enable_regulators...\n");
 			ret = arm_smmu_enable_regulators(smmu);
+			pr_info("arm_smmu_attach_dev: arm_smmu_enable_regulators ret=%d\n", ret);
 			if (ret)
 				goto err_unlock;
 		}
+		pr_info("arm_smmu_attach_dev: calling arm_smmu_enable_clocks...\n");
 		ret = arm_smmu_enable_clocks(smmu);
+		pr_info("arm_smmu_attach_dev: arm_smmu_enable_clocks ret=%d\n", ret);
 		if (ret)
 			goto err_disable_regulators;
+		pr_info("arm_smmu_attach_dev: calling arm_smmu_device_reset...\n");
 		arm_smmu_device_reset(smmu);
+		pr_info("arm_smmu_attach_dev: arm_smmu_device_reset ok, calling impl_def...\n");
 		arm_smmu_impl_def_programming(smmu);
+		pr_info("arm_smmu_attach_dev: impl_def ok\n");
 	} else {
 		ret = arm_smmu_enable_clocks(smmu);
 		if (ret)
@@ -2375,7 +2393,6 @@ static int arm_smmu_attach_dev(struct iommu_domain *domain, struct device *dev)
 
 	if (arm_smmu_is_static_cb(smmu)) {
 		ret = arm_smmu_populate_cb(smmu, smmu_domain, dev);
-
 		if (ret) {
 			dev_err(dev, "Failed to get valid context bank\n");
 			goto err_atomic_ctx;
@@ -2384,13 +2401,16 @@ static int arm_smmu_attach_dev(struct iommu_domain *domain, struct device *dev)
 	}
 
 	cfg = find_smmu_master_cfg(dev);
+	pr_info("arm_smmu_attach_dev: master_cfg=%p\n", cfg);
 	if (!cfg) {
 		ret = -ENODEV;
 		goto err_atomic_ctx;
 	}
 
+	pr_info("arm_smmu_attach_dev: calling arm_smmu_init_domain_context...\n");
 	/* Ensure that the domain is finalised */
 	ret = arm_smmu_init_domain_context(domain, smmu, cfg);
+	pr_info("arm_smmu_attach_dev: arm_smmu_init_domain_context ret=%d\n", ret);
 	if (IS_ERR_VALUE(ret))
 		goto err_atomic_ctx;
 
@@ -2406,14 +2426,19 @@ static int arm_smmu_attach_dev(struct iommu_domain *domain, struct device *dev)
 		goto err_destroy_domain_context;
 	}
 
+	pr_info("arm_smmu_attach_dev: calling arm_smmu_domain_add_master...\n");
 	/* Looks ok, so add the device to the domain */
 	ret = arm_smmu_domain_add_master(smmu_domain, cfg);
+	pr_info("arm_smmu_attach_dev: arm_smmu_domain_add_master ret=%d\n", ret);
 	if (ret)
 		goto err_destroy_domain_context;
 	dev->archdata.iommu = domain;
+	pr_info("arm_smmu_attach_dev: calling arm_smmu_disable_clocks...\n");
 	arm_smmu_disable_clocks(smmu);
+	pr_info("arm_smmu_attach_dev: arm_smmu_disable_clocks done\n");
 	mutex_unlock(&smmu->attach_lock);
 	mutex_unlock(&smmu_domain->init_mutex);
+	pr_info("arm_smmu_attach_dev: done! ret=%d\n", ret);
 	return ret;
 
 err_destroy_domain_context:
@@ -3547,6 +3572,7 @@ static void arm_smmu_device_reset(struct arm_smmu_device *smmu)
 	int i = 0;
 	u32 reg;
 
+	pr_info("arm_smmu_device_reset: ENTER smmu=%s\n", dev_name(smmu->dev));
 	/* clear global FSR */
 	reg = readl_relaxed(ARM_SMMU_GR0_NS(smmu) + ARM_SMMU_GR0_sGFSR);
 	writel(reg, ARM_SMMU_GR0_NS(smmu) + ARM_SMMU_GR0_sGFSR);
@@ -3595,6 +3621,7 @@ static void arm_smmu_device_reset(struct arm_smmu_device *smmu)
 	/* Push the button */
 	__arm_smmu_tlb_sync(smmu);
 	writel(reg, ARM_SMMU_GR0_NS(smmu) + ARM_SMMU_GR0_sCR0);
+	pr_info("arm_smmu_device_reset: done!\n");
 }
 
 static int arm_smmu_id_size_to_bits(int size)
@@ -4105,6 +4132,7 @@ static int arm_smmu_device_dt_probe(struct platform_device *pdev)
 		if (num_irqs > smmu->num_global_irqs)
 			smmu->num_context_irqs++;
 	}
+	smmu->num_context_irqs_probed = smmu->num_context_irqs;
 
 	if (!smmu->num_context_irqs) {
 		dev_err(dev, "found %d interrupts but expected at least %d\n",
