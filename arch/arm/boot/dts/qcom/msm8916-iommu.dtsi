@@ -13,7 +13,7 @@
 #include "msm-iommu-v2.dtsi"
 
 &gfx_iommu {
-	status = "ok";
+	status = "disabled";
 };
 
 &apps_iommu {

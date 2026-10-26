@@ -16,7 +16,6 @@
 		reg = <0x1f00000 0x10000>;
 		#iommu-cells = <1>;
 		qcom,dynamic;
-		qcom,register-save;
 		qcom,skip-init;
 		qcom,no-smr-check;
 		#global-interrupts = <2>;

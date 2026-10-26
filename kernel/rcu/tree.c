@@ -1232,6 +1232,7 @@ static void rcu_dump_cpu_stacks(struct rcu_state *rsp)
 		}
 		raw_spin_unlock_irqrestore(&rnp->lock, flags);
 	}
+	trigger_all_cpu_backtrace();
 }
 
 static void print_other_cpu_stall(struct rcu_state *rsp, unsigned long gpnum)

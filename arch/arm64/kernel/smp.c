@@ -816,6 +816,7 @@ static void ipi_cpu_backtrace(unsigned int cpu, struct pt_regs *regs)
 		raw_spin_lock(&backtrace_lock);
 		pr_warn("IPI backtrace for cpu %d\n", cpu);
 		show_regs(regs);
+		show_stack(NULL, NULL);
 		raw_spin_unlock(&backtrace_lock);
 		cpumask_clear_cpu(cpu, &backtrace_mask);
 	}

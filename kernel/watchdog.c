@@ -370,8 +370,10 @@ static void watchdog_check_hardlockup_other_cpu(void)
 					next_cpu);
 			msm_trigger_wdog_bite();
 		}
-		else
+		else {
 			WARN(1, "Watchdog detected hard LOCKUP on cpu %u", next_cpu);
+			trigger_all_cpu_backtrace();
+		}
 
 		per_cpu(hard_watchdog_warn, next_cpu) = true;
 	} else {
