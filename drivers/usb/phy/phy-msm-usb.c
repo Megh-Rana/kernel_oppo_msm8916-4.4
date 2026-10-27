@@ -246,9 +246,16 @@ static int msm_phy_notify_disconnect(struct usb_phy *phy,
 	struct msm_otg *motg = container_of(phy, struct msm_otg, phy);
 	int val;
 
+	pr_info("msm_phy_notify_disconnect: manual_pullup=%d\n", motg->manual_pullup);
+
 	if (motg->manual_pullup) {
 		val = ULPI_MISC_A_VBUSVLDEXT | ULPI_MISC_A_VBUSVLDEXTSEL;
-		usb_phy_io_write(phy, val, ULPI_CLR(ULPI_MISC_A));
+		ulpi_write(phy, val, ULPI_CLR(ULPI_MISC_A));
+
+		val = readl(USB_USBCMD);
+		val &= ~USBCMD_SESS_VLD_CTRL;
+		writel(val, USB_USBCMD);
+		mb();
 	}
 
 	/*
@@ -269,6 +276,9 @@ static int msm_phy_notify_connect(struct usb_phy *phy,
 	struct msm_otg *motg = container_of(phy, struct msm_otg, phy);
 	int val;
 
+	pr_info("msm_phy_notify_connect: manual_pullup=%d speed=%d\n",
+		motg->manual_pullup, speed);
+
 	if (motg->manual_pullup) {
 		val = ULPI_MISC_A_VBUSVLDEXTSEL | ULPI_MISC_A_VBUSVLDEXT;
 		ulpi_write(phy, val, ULPI_SET(ULPI_MISC_A));
@@ -280,6 +290,7 @@ static int msm_phy_notify_connect(struct usb_phy *phy,
 		val = readl(USB_USBCMD);
 		val |= USBCMD_SESS_VLD_CTRL;
 		writel(val, USB_USBCMD);
+		mb();
 	}
 
 	val = ulpi_read(phy, ULPI_FUNC_CTRL);

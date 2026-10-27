@@ -1355,12 +1355,16 @@ static int spmi_pmic_arb_probe(struct platform_device *pdev)
 	}
 
 	pa->irq = platform_get_irq_byname(pdev, "periph_irq");
+	if (pa->irq < 0)
+		pa->irq = platform_get_irq(pdev, 0);
 	if (pa->irq < 0) {
 		err = pa->irq;
 		goto err_put_ctrl;
 	}
 
 	err = of_property_read_u32(pdev->dev.of_node, "qcom,channel", &channel);
+	if (err)
+		err = of_property_read_u32(pdev->dev.of_node, "qcom,pmic-arb-channel", &channel);
 	if (err) {
 		dev_err(&pdev->dev, "channel unspecified.\n");
 		goto err_put_ctrl;
@@ -1376,6 +1380,8 @@ static int spmi_pmic_arb_probe(struct platform_device *pdev)
 	pa->channel = channel;
 
 	err = of_property_read_u32(pdev->dev.of_node, "qcom,ee", &ee);
+	if (err)
+		err = of_property_read_u32(pdev->dev.of_node, "qcom,pmic-arb-ee", &ee);
 	if (err) {
 		dev_err(&pdev->dev, "EE unspecified.\n");
 		goto err_put_ctrl;

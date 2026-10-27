@@ -632,7 +632,11 @@ int mdss_mdp_overlay_setup_scaling(struct mdss_mdp_pipe *pipe)
 		else
 			rc = __mdss_mdp_validate_pxl_extn(pipe);
 
-		return rc;
+		if (!rc)
+			return 0;
+
+		/* Smoothly fall back to standard scaling if validation fails */
+		pipe->scaler.enable = 0;
 	}
 
 	memset(&pipe->scaler, 0, sizeof(struct mdp_scale_data_v2));

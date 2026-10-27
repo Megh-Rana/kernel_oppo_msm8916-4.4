@@ -156,7 +156,16 @@ int opchg_get_prop_batt_capacity_from_bms(struct opchg_charger *chip)
 	int rc = 0;
 
 	if(!chip->bms_psy){
-		return OPCHG_DEFAULT_BATT_CAPACITY;
+		int v_mv = chip->bat_instant_vol / 1000;
+		if (v_mv < 3000)
+			v_mv = opchg_get_prop_battery_voltage_now(chip) / 1000;
+
+		if (v_mv >= 4300)
+			ret.intval = 100;
+		else if (v_mv <= 3400)
+			ret.intval = 1;
+		else
+			ret.intval = (v_mv - 3400) * 100 / (4300 - 3400);
 	} else if (chip->bms_psy) {
 		power_supply_get_property(chip->bms_psy, POWER_SUPPLY_PROP_CAPACITY, &ret);
 	}
@@ -286,7 +295,16 @@ int opchg_get_prop_batt_capacity_from_bms_bq24157(struct opchg_charger *chip)
 	int rc = 0;
 
 	if(!chip->bms_psy){
-		return OPCHG_DEFAULT_BATT_CAPACITY;
+		int v_mv = chip->bat_instant_vol / 1000;
+		if (v_mv < 3000)
+			v_mv = opchg_get_prop_battery_voltage_now(chip) / 1000;
+
+		if (v_mv >= 4300)
+			ret.intval = 100;
+		else if (v_mv <= 3400)
+			ret.intval = 1;
+		else
+			ret.intval = (v_mv - 3400) * 100 / (4300 - 3400);
 	} else if (chip->bms_psy) {
 		power_supply_get_property(chip->bms_psy, POWER_SUPPLY_PROP_CAPACITY, &ret);
 	}

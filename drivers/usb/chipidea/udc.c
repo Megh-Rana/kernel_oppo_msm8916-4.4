@@ -1597,32 +1597,18 @@ static int ci_udc_pullup(struct usb_gadget *_gadget, int is_on)
 	if (ci_otg_is_fsm_mode(ci) || ci->role == CI_ROLE_HOST)
 		return 0;
 
-	pr_info("ci_udc_pullup: is_on=%d\n", is_on);
+	pr_info("ci_udc_pullup: is_on=%d, usb_phy=%p\n", is_on, ci->usb_phy);
 
 	if (is_on) {
-		if (ci->usb_phy) {
-			usb_phy_io_write(ci->usb_phy,
-				0x03, /* ULPI_MISC_A_VBUSVLDEXT | ULPI_MISC_A_VBUSVLDEXTSEL */
-				0x96 | 0x40); /* ULPI_SET(ULPI_MISC_A) */
-			usb_phy_io_write(ci->usb_phy,
-				0x18, /* OPMODE bits */
-				0x04 | 0x80); /* ULPI_CLR(ULPI_FUNC_CTRL) -> normal opmode */
-		}
-		hw_write_id_reg(ci, 0x00a0, (1 << 7), (1 << 7)); /* GENCFG2_SESS_VLD_CTRL_EN */
-		hw_write_id_reg(ci, 0x0140, (1 << 25), (1 << 25)); /* USBCMD_SESS_VLD_CTRL (BIT 25) */
-		mb();
+		if (ci->usb_phy)
+			usb_phy_notify_connect(ci->usb_phy, ci->gadget.speed);
 
 		hw_write(ci, OP_USBCMD, USBCMD_RS, USBCMD_RS);
 	} else {
 		hw_write(ci, OP_USBCMD, USBCMD_RS, 0);
-		hw_write_id_reg(ci, 0x0140, (1 << 25), 0); /* clear USBCMD_SESS_VLD_CTRL */
-		mb();
-		if (ci->usb_phy) {
-			usb_phy_io_write(ci->usb_phy,
-				0x03,
-				0x96 | 0x80); /* ULPI_CLR(ULPI_MISC_A) */
+
+		if (ci->usb_phy)
 			usb_phy_notify_disconnect(ci->usb_phy, ci->gadget.speed);
-		}
 	}
 
 	return 0;

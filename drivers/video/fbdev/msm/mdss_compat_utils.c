@@ -3890,6 +3890,10 @@ static int __to_user_mdp_overlay(struct mdp_overlay32 __user *ov32,
 	if (ret)
 		return -EFAULT;
 
+	ret = put_user(ov->bg_color, &ov32->bg_color);
+	if (ret)
+		return -EFAULT;
+
 	ret |= put_user(ov->horz_deci, &ov32->horz_deci);
 	ret |= put_user(ov->vert_deci, &ov32->vert_deci);
 	if (ret)
@@ -3903,6 +3907,10 @@ static int __to_user_mdp_overlay(struct mdp_overlay32 __user *ov32,
 
 	ret = copy_in_user(&ov32->scale, &ov->scale,
 			   sizeof(struct mdp_scale_data));
+	if (ret)
+		return -EFAULT;
+
+	ret = put_user(ov->color_space, &ov32->color_space);
 	if (ret)
 		return -EFAULT;
 
@@ -3951,6 +3959,10 @@ static int __from_user_mdp_overlay(struct mdp_overlay __user *ov,
 			 sizeof(ov32->user_data)))
 		return -EFAULT;
 
+	if (get_user(data, &ov32->bg_color) ||
+	    put_user(data, &ov->bg_color))
+		return -EFAULT;
+
 	if (get_user(data, &ov32->horz_deci) ||
 	    put_user(data, &ov->horz_deci) ||
 	    get_user(data, &ov32->vert_deci) ||
@@ -3964,6 +3976,10 @@ static int __from_user_mdp_overlay(struct mdp_overlay __user *ov,
 
 	if (copy_in_user(&ov->scale, &ov32->scale,
 			 sizeof(struct mdp_scale_data)))
+		return -EFAULT;
+
+	if (get_user(data, &ov32->color_space) ||
+	    put_user((uint8_t)data, &ov->color_space))
 		return -EFAULT;
 
 	if (get_user(data, &ov32->frame_rate) ||
