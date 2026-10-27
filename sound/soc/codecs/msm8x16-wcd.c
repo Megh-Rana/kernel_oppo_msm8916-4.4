@@ -6169,12 +6169,25 @@ static int msm8x16_wcd_device_init(struct msm8x16_wcd *msm8x16)
 	return 0;
 }
 
+static u32 msm8x16_wcd_get_base_addr(struct platform_device *pdev)
+{
+	struct resource *wcd_resource = platform_get_resource(pdev, IORESOURCE_MEM, 0);
+	u32 base_addr = 0;
+
+	if (wcd_resource)
+		return wcd_resource->start;
+	if (pdev->dev.of_node && !of_property_read_u32(pdev->dev.of_node, "reg", &base_addr))
+		return base_addr;
+
+	return 0;
+}
+
 static int msm8x16_wcd_probe(struct platform_device *pdev)
 {
 	int ret = 0;
 	struct msm8x16_wcd *msm8x16 = NULL;
 	struct msm8x16_wcd_pdata *pdata;
-	struct resource *wcd_resource;
+	u32 base_addr = 0;
 	int modem_state;
 	int q6_state;
 	static int spmi_dev_registered_cnt;
@@ -6192,24 +6205,24 @@ static int msm8x16_wcd_probe(struct platform_device *pdev)
 		return -EPROBE_DEFER;
 	}
 
-	wcd_resource = platform_get_resource(pdev, IORESOURCE_MEM, 0);
-	if (!wcd_resource) {
+	base_addr = msm8x16_wcd_get_base_addr(pdev);
+	if (!base_addr) {
 		dev_err(&pdev->dev, "Unable to get Tombak base address\n");
 		return -ENXIO;
 	}
 
-	switch (wcd_resource->start) {
+	switch (base_addr) {
 	case TOMBAK_CORE_0_SPMI_ADDR:
 		msm8x16_wcd_modules[0].pdev = pdev;
 		msm8x16_wcd_modules[0].spmi = spmi;
-		msm8x16_wcd_modules[0].base = wcd_resource->start;
+		msm8x16_wcd_modules[0].base = base_addr;
 		wcd9xxx_spmi_set_dev(pdev, 0);
 		device_init_wakeup(&pdev->dev, true);
 		break;
 	case TOMBAK_CORE_1_SPMI_ADDR:
 		msm8x16_wcd_modules[1].pdev = pdev;
 		msm8x16_wcd_modules[1].spmi = spmi;
-		msm8x16_wcd_modules[1].base = wcd_resource->start;
+		msm8x16_wcd_modules[1].base = base_addr;
 		wcd9xxx_spmi_set_dev(pdev, 1);
 		if (wcd9xxx_spmi_irq_init()) {
 			dev_err(&pdev->dev,
@@ -6226,10 +6239,10 @@ static int msm8x16_wcd_probe(struct platform_device *pdev)
 	}
 
 
-	dev_dbg(&spmi->dev, "%s(%d):start addr = 0x%pK\n",
-		__func__, __LINE__,  &wcd_resource->start);
+	dev_dbg(&spmi->dev, "%s(%d):start addr = 0x%x\n",
+		__func__, __LINE__,  base_addr);
 
-	if (wcd_resource->start != TOMBAK_CORE_0_SPMI_ADDR)
+	if (base_addr != TOMBAK_CORE_0_SPMI_ADDR)
 		goto rtn;
 
 	if (pdev->dev.of_node) {
@@ -6328,15 +6341,14 @@ static int msm8x16_wcd_remove(struct platform_device *pdev)
 static int msm8x16_wcd_dev_resume(struct device *dev)
 {
 	struct platform_device *pdev = to_platform_device(dev);
-	struct resource *wcd_resource;
+	u32 base_addr = msm8x16_wcd_get_base_addr(pdev);
 
-	wcd_resource = platform_get_resource(pdev, IORESOURCE_MEM, 0);
-	if (!wcd_resource) {
+	if (!base_addr) {
 		dev_err(dev, "Unable to get CDC SPMI resource\n");
 		return -ENXIO;
 	}
 
-	if (wcd_resource->start == TOMBAK_CORE_0_SPMI_ADDR)
+	if (base_addr == TOMBAK_CORE_0_SPMI_ADDR)
 		return wcd9xxx_spmi_resume();
 	return 0;
 }
@@ -6344,15 +6356,14 @@ static int msm8x16_wcd_dev_resume(struct device *dev)
 static int msm8x16_wcd_dev_suspend(struct device *dev)
 {
 	struct platform_device *pdev = to_platform_device(dev);
-	struct resource *wcd_resource;
+	u32 base_addr = msm8x16_wcd_get_base_addr(pdev);
 
-	wcd_resource = platform_get_resource(pdev, IORESOURCE_MEM, 0);
-	if (!wcd_resource) {
+	if (!base_addr) {
 		dev_err(dev, "Unable to get CDC SPMI resource\n");
 		return -ENXIO;
 	}
 
-	if (wcd_resource->start == TOMBAK_CORE_0_SPMI_ADDR) {
+	if (base_addr == TOMBAK_CORE_0_SPMI_ADDR) {
 		pm_message_t pmesg = PMSG_SUSPEND;
 		return wcd9xxx_spmi_suspend(pmesg);
 	}

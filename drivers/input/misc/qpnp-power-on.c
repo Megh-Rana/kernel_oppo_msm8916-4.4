@@ -176,8 +176,8 @@ struct qpnp_pon_config {
 	u32 s2_timer;
 	u32 s2_type;
 	u32 pull_up;
-	u32 state_irq;
-	u32 bark_irq;
+	int state_irq;
+	int bark_irq;
 	u16 s2_cntl_addr;
 	u16 s2_cntl2_addr;
 	bool old_state;

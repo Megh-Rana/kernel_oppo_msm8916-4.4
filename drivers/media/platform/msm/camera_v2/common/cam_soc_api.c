@@ -47,7 +47,7 @@ static int msm_camera_get_clk_info_internal(struct device *dev,
 			size_t *num_clk)
 {
 	int rc = 0;
-	size_t cnt, tmp;
+	int cnt, tmp;
 	uint32_t *rates, i = 0;
 	const char *clk_ctl = NULL;
 	bool clock_cntl_support = false;
@@ -57,7 +57,7 @@ static int msm_camera_get_clk_info_internal(struct device *dev,
 
 	cnt = of_property_count_strings(of_node, "clock-names");
 	if (cnt <= 0) {
-		pr_err("err: No clocks found in DT=%zu\n", cnt);
+		pr_err("err: No clocks found in DT=%d\n", cnt);
 		return -EINVAL;
 	}
 
@@ -66,7 +66,7 @@ static int msm_camera_get_clk_info_internal(struct device *dev,
 		pr_warn("warn: No clk rates in DT, default to 24MHz / 0\n");
 		tmp = cnt;
 	} else if (cnt != tmp) {
-		pr_err("err: clk name/rates mismatch, strings=%zu, rates=%zu\n",
+		pr_err("err: clk name/rates mismatch, strings=%d, rates=%d\n",
 			cnt, tmp);
 		return -EINVAL;
 	}
@@ -75,12 +75,12 @@ static int msm_camera_get_clk_info_internal(struct device *dev,
 		tmp = of_property_count_strings(of_node,
 				"qcom,clock-control");
 		if (tmp <= 0) {
-			pr_err("err: control strings not found in DT count=%zu",
+			pr_err("err: control strings not found in DT count=%d",
 				tmp);
 			return -EINVAL;
 		}
 		if (cnt != tmp) {
-			pr_err("err: controls mismatch, strings=%zu, ctl=%zu\n",
+			pr_err("err: controls mismatch, strings=%d, ctl=%d\n",
 				cnt, tmp);
 			return -EINVAL;
 		}

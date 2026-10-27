@@ -4627,9 +4627,9 @@ static int cpp_probe(struct platform_device *pdev)
 			&cpp_dev->micro_iface_reset);
 	if (rc < 0) {
 		cpp_dev->micro_iface_reset = NULL;
-		pr_err("%s: failed to get micro_iface_reset\n",
-				__func__);
-		goto get_reg_err;
+		pr_debug("%s: micro_iface_reset optional, not found (%d)\n",
+				__func__, rc);
+		rc = 0;
 	}
 
 	rc = msm_camera_get_regulator_info(pdev, &cpp_dev->cpp_vdd,
@@ -4728,8 +4728,8 @@ cpp_probe_init_error:
 	media_entity_cleanup(&cpp_dev->msm_sd.sd.entity);
 	msm_sd_unregister(&cpp_dev->msm_sd);
 get_reset_err:
-	reset_control_put(cpp_dev->micro_iface_reset);
-get_reg_err:
+	if (cpp_dev->micro_iface_reset)
+		reset_control_put(cpp_dev->micro_iface_reset);
 	msm_camera_put_clk_info(pdev, &cpp_dev->clk_info, &cpp_dev->cpp_clk,
 		cpp_dev->num_clks);
 mem_err:
@@ -4789,7 +4789,8 @@ static int cpp_device_remove(struct platform_device *dev)
 	mutex_destroy(&cpp_dev->mutex);
 	kfree(cpp_dev->work);
 
-	reset_control_put(cpp_dev->micro_iface_reset);
+	if (cpp_dev->micro_iface_reset)
+		reset_control_put(cpp_dev->micro_iface_reset);
 
 	destroy_workqueue(cpp_dev->timer_wq);
 	kfree(cpp_dev->cpp_clk);

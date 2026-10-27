@@ -2320,6 +2320,10 @@ static int mdss_mdp_pipe_solidfill_setup(struct mdss_mdp_pipe *pipe)
 {
 	int ret;
 	u32 secure, format, unpack, opmode = 0;
+	u32 color = pipe->bg_color;
+
+	if (!(pipe->flags & MDP_SOLID_FILL) || color == 0xffffffff)
+		color = 0x00000000;
 
 	pr_debug("solid fill setup on pnum=%d\n", pipe->num);
 
@@ -2350,7 +2354,7 @@ static int mdss_mdp_pipe_solidfill_setup(struct mdss_mdp_pipe *pipe)
 		mdss_mdp_pipe_write(pipe,
 			MDSS_MDP_REG_SSPP_SRC_FORMAT, format);
 		mdss_mdp_pipe_write(pipe,
-			MDSS_MDP_REG_SSPP_SRC_CONSTANT_COLOR, pipe->bg_color);
+			MDSS_MDP_REG_SSPP_SRC_CONSTANT_COLOR, color);
 		mdss_mdp_pipe_write(pipe,
 			MDSS_MDP_REG_SSPP_SRC_UNPACK_PATTERN, unpack);
 		mdss_mdp_pipe_write(pipe,
@@ -2360,7 +2364,7 @@ static int mdss_mdp_pipe_solidfill_setup(struct mdss_mdp_pipe *pipe)
 			MDSS_MDP_REG_SSPP_SRC_FORMAT_REC1, format);
 		mdss_mdp_pipe_write(pipe,
 			MDSS_MDP_REG_SSPP_SRC_CONSTANT_COLOR_REC1,
-			pipe->bg_color);
+			color);
 		mdss_mdp_pipe_write(pipe,
 			MDSS_MDP_REG_SSPP_SRC_UNPACK_PATTERN_REC1, unpack);
 		mdss_mdp_pipe_write(pipe,

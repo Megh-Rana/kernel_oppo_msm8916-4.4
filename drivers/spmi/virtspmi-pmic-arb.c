@@ -595,7 +595,7 @@ static int qpnpint_irq_domain_dt_translate(struct irq_domain *d,
 
 	if (irq_domain_get_of_node(d) != controller)
 		return -EINVAL;
-	if (intsize != 4)
+	if (intsize != 3 && intsize != 4)
 		return -EINVAL;
 	if (intspec[0] > 0xF || intspec[1] > 0xFF || intspec[2] > 0x7)
 		return -EINVAL;
@@ -616,7 +616,7 @@ static int qpnpint_irq_domain_dt_translate(struct irq_domain *d,
 		pa->min_apid = apid;
 
 	*out_hwirq = HWIRQ(intspec[0], intspec[1], intspec[2], apid);
-	*out_type  = intspec[3] & IRQ_TYPE_SENSE_MASK;
+	*out_type  = (intsize >= 4) ? (intspec[3] & IRQ_TYPE_SENSE_MASK) : IRQ_TYPE_NONE;
 
 	dev_dbg(&pa->spmic->dev, "out_hwirq = %lu\n", *out_hwirq);
 

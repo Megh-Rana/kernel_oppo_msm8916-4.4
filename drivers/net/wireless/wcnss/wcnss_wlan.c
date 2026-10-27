@@ -2447,7 +2447,7 @@ static void wcnss_nvbin_dnld(void)
 		ret = wcnss_smd_tx(outbuffer, dnld_req_msg->hdr.msg_len);
 
 		retry_count = 0;
-		while ((ret == -ENOSPC) && (retry_count <= 3)) {
+		while ((ret == -ENOSPC) && (retry_count <= 25)) {
 			pr_debug("wcnss: %s: smd tx failed, ENOSPC\n",
 				__func__);
 			pr_debug("fragment: %d, len: %d, TotFragments: %d, retry_count: %d\n",
@@ -2455,7 +2455,7 @@ static void wcnss_nvbin_dnld(void)
 				total_fragments, retry_count);
 
 			/* wait and try again */
-			msleep(20);
+			msleep(50);
 			retry_count++;
 			ret = wcnss_smd_tx(outbuffer,
 				dnld_req_msg->hdr.msg_len);
@@ -2544,7 +2544,7 @@ static void wcnss_caldata_dnld(const void *cal_data,
 		ret = wcnss_smd_tx(outbuffer, cal_msg->hdr.msg_len);
 
 		retry_count = 0;
-		while ((ret == -ENOSPC) && (retry_count <= 3)) {
+		while ((ret == -ENOSPC) && (retry_count <= 25)) {
 			pr_debug("wcnss: %s: smd tx failed, ENOSPC\n",
 					__func__);
 			pr_debug("fragment: %d, len: %d, TotFragments: %d, retry_count: %d\n",
@@ -2552,7 +2552,7 @@ static void wcnss_caldata_dnld(const void *cal_data,
 				total_fragments, retry_count);
 
 			/* wait and try again */
-			msleep(20);
+			msleep(50);
 			retry_count++;
 			ret = wcnss_smd_tx(outbuffer,
 				cal_msg->hdr.msg_len);

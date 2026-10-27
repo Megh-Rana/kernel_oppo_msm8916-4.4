@@ -295,7 +295,7 @@ static int msm_phy_notify_connect(struct usb_phy *phy,
 
 	val = ulpi_read(phy, ULPI_FUNC_CTRL);
 	val &= ~ULPI_FUNC_CTRL_OPMODE_MASK;
-	val |= ULPI_FUNC_CTRL_OPMODE_NORMAL;
+	val |= ULPI_FUNC_CTRL_OPMODE_NORMAL | ULPI_FUNC_CTRL_SUSPENDM;
 	ulpi_write(phy, val, ULPI_FUNC_CTRL);
 
 	return 0;
@@ -472,6 +472,10 @@ static int msm_phy_init(struct usb_phy *phy)
 		ulpi_write(phy, ulpi_val, ULPI_USB_INT_EN_FALL);
 	}
 
+	if (pdata->otg_control == OTG_PMIC_CONTROL) {
+		ulpi_write(phy, OTG_COMP_DISABLE, ULPI_SET(ULPI_PWR_CLK_MNG_REG));
+	}
+
 	if (motg->manual_pullup) {
 		val = ULPI_MISC_A_VBUSVLDEXTSEL | ULPI_MISC_A_VBUSVLDEXT;
 		ulpi_write(phy, val, ULPI_SET(ULPI_MISC_A));
@@ -486,7 +490,7 @@ static int msm_phy_init(struct usb_phy *phy)
 
 		val = ulpi_read(phy, ULPI_FUNC_CTRL);
 		val &= ~ULPI_FUNC_CTRL_OPMODE_MASK;
-		val |= ULPI_FUNC_CTRL_OPMODE_NORMAL;
+		val |= ULPI_FUNC_CTRL_OPMODE_NORMAL | ULPI_FUNC_CTRL_SUSPENDM;
 		ulpi_write(phy, val, ULPI_FUNC_CTRL);
 	}
 
