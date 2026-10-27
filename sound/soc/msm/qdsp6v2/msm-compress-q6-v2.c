@@ -4617,15 +4617,23 @@ static int msm_compr_add_app_type_cfg_control(struct snd_soc_pcm_runtime *rtd)
 		}
 	};
 
+	bool is_capture = false;
+	int dev_num = 0;
+
 	if (!rtd) {
 		pr_err("%s NULL rtd\n", __func__);
 		return 0;
 	}
 
+	if (rtd->pcm)
+		dev_num = rtd->pcm->device;
+	if (rtd->compr && rtd->compr->direction == SND_COMPRESS_CAPTURE)
+		is_capture = true;
+
 	pr_debug("%s: added new compr FE ctl with name %s, id %d, cpu dai %s, device no %d\n",
 		__func__, rtd->dai_link->name, rtd->dai_link->be_id,
-			rtd->dai_link->cpu_dai_name, rtd->pcm->device);
-	if (rtd->compr->direction == SND_COMPRESS_PLAYBACK)
+			rtd->dai_link->cpu_dai_name, dev_num);
+	if (!is_capture)
 		ctl_len = strlen(playback_mixer_ctl_name) + 1 + strlen(deviceNo)
 			 + 1 + strlen(suffix) + 1;
 	else
@@ -4639,17 +4647,17 @@ static int msm_compr_add_app_type_cfg_control(struct snd_soc_pcm_runtime *rtd)
 		return 0;
 	}
 
-	if (rtd->compr->direction == SND_COMPRESS_PLAYBACK)
+	if (!is_capture)
 		snprintf(mixer_str, ctl_len, "%s %d %s",
-			 playback_mixer_ctl_name, rtd->pcm->device, suffix);
+			 playback_mixer_ctl_name, dev_num, suffix);
 	else
 		snprintf(mixer_str, ctl_len, "%s %d %s",
-			 capture_mixer_ctl_name, rtd->pcm->device, suffix);
+			 capture_mixer_ctl_name, dev_num, suffix);
 
 	fe_app_type_cfg_control[0].name = mixer_str;
 	fe_app_type_cfg_control[0].private_value = rtd->dai_link->be_id;
 
-	if (rtd->compr->direction == SND_COMPRESS_PLAYBACK) {
+	if (!is_capture) {
 		fe_app_type_cfg_control[0].put =
 					 msm_compr_playback_app_type_cfg_put;
 		fe_app_type_cfg_control[0].get =

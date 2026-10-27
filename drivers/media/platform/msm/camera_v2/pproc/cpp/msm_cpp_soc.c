@@ -85,7 +85,8 @@ int msm_cpp_get_regulator_index(struct cpp_device *cpp_dev,
 
 static int cpp_get_clk_freq_tbl_dt(struct cpp_device *cpp_dev)
 {
-	uint32_t i, count, min_clk_rate;
+	uint32_t i, min_clk_rate;
+	int count;
 	uint32_t idx = 0;
 	struct device_node *of_node;
 	uint32_t *rates;
@@ -109,8 +110,16 @@ static int cpp_get_clk_freq_tbl_dt(struct cpp_device *cpp_dev)
 
 	}
 	count = of_property_count_u32_elems(of_node, "qcom,src-clock-rates");
-	if ((count == 0) || (count > MAX_FREQ_TBL)) {
-		pr_err("Clock count is invalid\n");
+	if (count <= 0) {
+		pr_warn("%s: no src-clock-rates in DT, fallback to default rates\n", __func__);
+		hw_info->freq_tbl[0] = 160000000;
+		hw_info->freq_tbl[1] = 266670000;
+		hw_info->freq_tbl[2] = 320000000;
+		hw_info->freq_tbl_count = 3;
+		return 0;
+	}
+	if (count > MAX_FREQ_TBL) {
+		pr_err("Clock count is invalid: %d\n", count);
 		rc = -EINVAL;
 		goto err;
 	}
