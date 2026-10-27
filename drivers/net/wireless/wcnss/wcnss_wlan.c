@@ -1838,7 +1838,8 @@ static int wcnss_smd_tx(void *data, int len)
 
 	ret = smd_write_avail(penv->smd_ch);
 	if (ret < len) {
-		pr_err("wcnss: no space available for smd frame\n");
+		pr_debug("wcnss: no space available for smd frame (avail=%d, need=%d)\n",
+			ret, len);
 		return -ENOSPC;
 	}
 	ret = smd_write(penv->smd_ch, data, len);
@@ -2282,9 +2283,16 @@ static void wcnssctrl_rx_handler(struct work_struct *worker)
 		}
 
 		if (len < sizeof(struct smd_msg_hdr)) {
-			pr_err("wcnss: incomplete header available len = %d\n",
-			       len);
-			return;
+			int retry = 20;
+			while (retry-- && len < sizeof(struct smd_msg_hdr)) {
+				usleep_range(200, 400);
+				len = smd_read_avail(penv->smd_ch);
+			}
+			if (len < sizeof(struct smd_msg_hdr)) {
+				pr_err("wcnss: incomplete header available len = %d\n",
+				       len);
+				return;
+			}
 		}
 
 		wcnss_process_smd_msg(len);
@@ -2447,7 +2455,7 @@ static void wcnss_nvbin_dnld(void)
 		ret = wcnss_smd_tx(outbuffer, dnld_req_msg->hdr.msg_len);
 
 		retry_count = 0;
-		while ((ret == -ENOSPC) && (retry_count <= 25)) {
+		while ((ret == -ENOSPC) && (retry_count <= 100)) {
 			pr_debug("wcnss: %s: smd tx failed, ENOSPC\n",
 				__func__);
 			pr_debug("fragment: %d, len: %d, TotFragments: %d, retry_count: %d\n",
@@ -2544,7 +2552,7 @@ static void wcnss_caldata_dnld(const void *cal_data,
 		ret = wcnss_smd_tx(outbuffer, cal_msg->hdr.msg_len);
 
 		retry_count = 0;
-		while ((ret == -ENOSPC) && (retry_count <= 25)) {
+		while ((ret == -ENOSPC) && (retry_count <= 100)) {
 			pr_debug("wcnss: %s: smd tx failed, ENOSPC\n",
 					__func__);
 			pr_debug("fragment: %d, len: %d, TotFragments: %d, retry_count: %d\n",

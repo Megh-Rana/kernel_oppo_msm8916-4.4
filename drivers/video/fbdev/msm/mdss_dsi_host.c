@@ -2196,11 +2196,13 @@ static int mdss_dsi_cmd_dma_tx(struct mdss_dsi_ctrl_pdata *ctrl,
 		ret = mdss_smmu_dsi_map_buffer(tp->dmap, domain, ctrl->dma_size,
 			&(ctrl->dma_addr), tp->start, DMA_TO_DEVICE);
 		if (IS_ERR_VALUE(ret)) {
-			pr_err("unable to map dma memory to iommu(%d)\n", ret);
-			ctrl->mdss_util->iommu_unlock();
-			return -ENOMEM;
+			pr_warn("unable to map dma memory to iommu(%d), fallback to physical %pad\n",
+				ret, &tp->dmap);
+			ctrl->dma_addr = tp->dmap;
+			ctrl->dmap_iommu_map = false;
+		} else {
+			ctrl->dmap_iommu_map = true;
 		}
-		ctrl->dmap_iommu_map = true;
 	} else {
 		ctrl->dma_addr = tp->dmap;
 	}

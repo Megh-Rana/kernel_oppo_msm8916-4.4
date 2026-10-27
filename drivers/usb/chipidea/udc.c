@@ -1605,9 +1605,14 @@ static int ci_udc_pullup(struct usb_gadget *_gadget, int is_on)
 		if (ci->usb_phy)
 			usb_phy_notify_connect(ci->usb_phy, ci->gadget.speed);
 
+		if (ci->ep0out && ci->ep0out->qh.dma)
+			hw_device_state(ci, ci->ep0out->qh.dma);
+
 		hw_write(ci, OP_USBCMD, USBCMD_RS, USBCMD_RS);
 	} else {
 		hw_write(ci, OP_USBCMD, USBCMD_RS, 0);
+
+		hw_device_state(ci, 0);
 
 		if (ci->usb_phy)
 			usb_phy_notify_disconnect(ci->usb_phy, ci->gadget.speed);

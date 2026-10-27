@@ -596,13 +596,15 @@ static int mdss_smmu_dsi_map_buffer_v2(phys_addr_t phys, unsigned int domain,
 	struct mdss_smmu_client *mdss_smmu = mdss_smmu_get_cb(domain);
 	if (!mdss_smmu) {
 		pr_err("not able to get smmu context\n");
-		return -EINVAL;
+		*dma_addr = phys;
+		return 0;
 	}
 
 	*dma_addr = dma_map_single(mdss_smmu->base.dev, cpu_addr, size, dir);
 	if (IS_ERR_VALUE(*dma_addr)) {
-		pr_err("dma map single failed\n");
-		return -ENOMEM;
+		pr_debug("dma map single failed, fallback to physical %pad\n", &phys);
+		*dma_addr = phys;
+		return 0;
 	}
 	return 0;
 }

@@ -869,6 +869,7 @@ struct vfe_parent_device {
 };
 
 int vfe_hw_probe(struct platform_device *pdev);
+void vfe_init_common_data_if_needed(struct vfe_device *vfe_dev);
 void msm_isp_update_last_overflow_ab_ib(struct vfe_device *vfe_dev);
 
 #endif

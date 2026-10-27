@@ -519,6 +519,50 @@ static struct v4l2_file_operations msm_isp_v4l2_fops = {
 	.mmap = msm_isp_v4l2_fops_mmap
 };
 
+void vfe_init_common_data_if_needed(struct vfe_device *vfe_dev)
+{
+	static bool inited = false;
+	int i;
+
+	if (!inited) {
+		memset(&vfe_common_data, 0, sizeof(vfe_common_data));
+		mutex_init(&vfe_common_data.vfe_common_mutex);
+		spin_lock_init(&vfe_common_data.common_dev_data_lock);
+		spin_lock_init(&vfe_common_data.vfe_irq_dump.common_dev_irq_dump_lock);
+		spin_lock_init(&vfe_common_data.vfe_irq_dump.common_dev_tasklet_dump_lock);
+		for (i = 0; i < (VFE_AXI_SRC_MAX * MAX_VFE); i++)
+			spin_lock_init(&(vfe_common_data.streams[i].lock));
+		for (i = 0; i < (MSM_ISP_STATS_MAX * MAX_VFE); i++)
+			spin_lock_init(&(vfe_common_data.stats_streams[i].lock));
+
+		for (i = 0; i <= MAX_VFE; i++) {
+			INIT_LIST_HEAD(&vfe_common_data.tasklets[i].tasklet_q);
+			tasklet_init(&vfe_common_data.tasklets[i].tasklet,
+				msm_isp_do_tasklet,
+				(unsigned long)(&vfe_common_data.tasklets[i]));
+			spin_lock_init(&vfe_common_data.tasklets[i].tasklet_lock);
+		}
+		inited = true;
+	}
+
+	if (vfe_dev && !vfe_dev->common_data) {
+		int id = (vfe_dev->pdev) ? vfe_dev->pdev->id : 0;
+		if (id < 0 || id >= MAX_VFE)
+			id = 0;
+		vfe_dev->common_data = &vfe_common_data;
+		vfe_dev->common_data->dual_vfe_res = &dualvfe;
+		vfe_dev->common_data->dual_vfe_res->axi_data[id] =
+			&vfe_dev->axi_data;
+		vfe_dev->common_data->dual_vfe_res->stats_data[id] =
+			&vfe_dev->stats_data;
+		vfe_dev->common_data->dual_vfe_res->vfe_dev[id] =
+			vfe_dev;
+		pr_info("%s: Initialized fallback common_data for single VFE dev id=%d\n",
+			__func__, id);
+	}
+}
+EXPORT_SYMBOL(vfe_init_common_data_if_needed);
+
 static int vfe_set_common_data(struct platform_device *pdev)
 {
 	struct v4l2_subdev *sd = NULL;
@@ -695,6 +739,8 @@ int vfe_hw_probe(struct platform_device *pdev)
 	ISP_DBG("%s: device id = %d\n", __func__, pdev->id);
 
 	vfe_dev->pdev = pdev;
+
+	vfe_init_common_data_if_needed(vfe_dev);
 
 	rc = vfe_dev->hw_info->vfe_ops.platform_ops.get_platform_data(vfe_dev);
 	if (rc < 0) {

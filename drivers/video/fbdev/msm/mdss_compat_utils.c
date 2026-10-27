@@ -4180,6 +4180,8 @@ int mdss_compat_overlay_ioctl(struct fb_info *info, unsigned int cmd,
 				 __func__, __LINE__, sizeof(*ov));
 			return -EINVAL;
 		}
+		if (clear_user(ov, alloc_size))
+			return -EFAULT;
 		ov32 = compat_ptr(arg);
 		ret = __pp_sspp_set_offsets(ov);
 		if (ret) {
@@ -4202,6 +4204,8 @@ int mdss_compat_overlay_ioctl(struct fb_info *info, unsigned int cmd,
 				 __func__, __LINE__, sizeof(*ov));
 			return -EINVAL;
 		}
+		if (clear_user(ov, alloc_size))
+			return -EFAULT;
 		ret = __pp_sspp_set_offsets(ov);
 		if (ret) {
 			pr_err("setting the pp offsets failed ret %d\n", ret);
@@ -4241,6 +4245,8 @@ int mdss_compat_overlay_ioctl(struct fb_info *info, unsigned int cmd,
 				 layers_refs_sz + layers_sz + prepare_sz);
 			return -EINVAL;
 		}
+		if (clear_user(total_mem_chunk, prepare_sz + layers_refs_sz + layers_sz))
+			return -EFAULT;
 
 		layers_head = (struct mdp_overlay __user **)(total_mem_chunk + prepare_sz);
 		contig_overlays = (struct mdp_overlay __user *)(total_mem_chunk +

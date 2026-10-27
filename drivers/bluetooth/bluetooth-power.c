@@ -639,8 +639,11 @@ static int bt_power_probe(struct platform_device *pdev)
 			sizeof(struct bluetooth_power_platform_data));
 		pwr_state = 0;
 	} else {
-		BT_PWR_ERR("Failed to get platform data");
-		goto free_pdata;
+		/* Fallback for internal SoC Bluetooth (Pronto / SMD) */
+		bt_power_pdata->bt_power_setup = bluetooth_power;
+		pdev->dev.platform_data = bt_power_pdata;
+		pwr_state = 0;
+		BT_PWR_INFO("Initialized bt_power for internal SoC Bluetooth");
 	}
 
 	if (bluetooth_power_rfkill_probe(pdev) < 0)
@@ -733,11 +736,21 @@ static const struct file_operations bt_dev_fops = {
 	.compat_ioctl = bt_ioctl,
 };
 
+static struct platform_device *bt_power_plat_dev;
+
 static int __init bluetooth_power_init(void)
 {
 	int ret;
 
 	ret = platform_driver_register(&bt_power_driver);
+
+	if (!btpdev) {
+		bt_power_plat_dev = platform_device_register_simple("bt_power", -1, NULL, 0);
+		if (IS_ERR(bt_power_plat_dev)) {
+			BT_PWR_ERR("failed to register simple bt_power device");
+			bt_power_plat_dev = NULL;
+		}
+	}
 
 	bt_major = register_chrdev(0, "bt", &bt_dev_fops);
 	if (bt_major < 0) {

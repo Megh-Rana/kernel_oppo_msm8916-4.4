@@ -1984,11 +1984,11 @@ static int mdss_fb_blank_unblank(struct msm_fb_data_type *mfd)
 				mdss_fb_set_backlight(mfd, mfd->unset_bl_level);
 
 			/*
-			 * it blocks the backlight update between unblank and
-			 * first kickoff to avoid backlight turn on before black
-			 * frame is transferred to panel through unblank call.
+			 * In Android 10 HWComposer, frames are committed via overlay
+			 * atomic commits, so mdss_fb_update_backlight() is not called.
+			 * Keep allow_bl_update = true so DisplayPowerController is not blocked.
 			 */
-			mfd->allow_bl_update = false;
+			mfd->allow_bl_update = true;
 		}
 		mutex_unlock(&mfd->bl_lock);
 	}

@@ -2279,6 +2279,11 @@ int msm_isp_open_node(struct v4l2_subdev *sd, struct v4l2_subdev_fh *fh)
 
 	if (vfe_dev->common_data == NULL ||
 		vfe_dev->common_data->dual_vfe_res == NULL) {
+		vfe_init_common_data_if_needed(vfe_dev);
+	}
+
+	if (vfe_dev->common_data == NULL ||
+		vfe_dev->common_data->dual_vfe_res == NULL) {
 		pr_err("%s: Error in probe. No common_data or dual vfe res\n",
 			__func__);
 		return -EINVAL;
