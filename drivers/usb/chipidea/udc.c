@@ -1602,6 +1602,11 @@ static int ci_udc_pullup(struct usb_gadget *_gadget, int is_on)
 	if (is_on) {
 		ci_hdrc_enter_lpm(ci, false);
 
+		if (!ci->vbus_active) {
+			ci->vbus_active = 1;
+			usb_udc_vbus_handler(&ci->gadget, true);
+		}
+
 		if (ci->usb_phy)
 			usb_phy_notify_connect(ci->usb_phy, ci->gadget.speed);
 
@@ -1616,6 +1621,11 @@ static int ci_udc_pullup(struct usb_gadget *_gadget, int is_on)
 
 		if (ci->usb_phy)
 			usb_phy_notify_disconnect(ci->usb_phy, ci->gadget.speed);
+
+		if (ci->vbus_active) {
+			ci->vbus_active = 0;
+			usb_udc_vbus_handler(&ci->gadget, false);
+		}
 	}
 
 	return 0;

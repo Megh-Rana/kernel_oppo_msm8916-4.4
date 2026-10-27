@@ -1850,11 +1850,11 @@ static inline bool __mdss_dsi_cmd_mode_config(
 	u32 dsi_ctrl;
 
 	dsi_ctrl = MIPI_INP((ctrl->ctrl_base) + 0x0004);
-	/* if currently in video mode, enable command mode */
+	/* enable command mode if not already set */
 	if (enable) {
-		if ((dsi_ctrl) & BIT(1)) {
+		if (!(dsi_ctrl & BIT(2))) {
 			MIPI_OUTP((ctrl->ctrl_base) + 0x0004,
-				dsi_ctrl | BIT(2));
+				dsi_ctrl | BIT(0) | BIT(2));
 			mode_changed = true;
 		}
 	} else {
@@ -2271,6 +2271,10 @@ static int mdss_dsi_cmd_dma_tx(struct mdss_dsi_ctrl_pdata *ctrl,
 			pr_warn("%s: dma tx done but irq not triggered\n",
 				__func__);
 		} else {
+			pr_warn("%s: dma tx timed out, resetting DSI controller\n",
+				__func__);
+			mdss_dsi_sw_reset(ctrl, false);
+			mdss_dsi_disable_irq(ctrl, DSI_CMD_TERM);
 			ret = -ETIMEDOUT;
 		}
 	}

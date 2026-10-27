@@ -3806,10 +3806,15 @@ static long msm_cpp_subdev_do_ioctl(
 				break;
 			}
 		}
-		if (copy_to_user(
-				(void __user *)ioctl_ptr->ioctl_ptr, &inst_info,
-				sizeof(struct msm_cpp_frame_info_t))) {
-			return -EFAULT;
+		{
+			size_t copy_len = sizeof(struct msm_cpp_frame_info_t);
+			if (ioctl_ptr->len > 0 && ioctl_ptr->len < copy_len)
+				copy_len = ioctl_ptr->len;
+			if (copy_to_user(
+					(void __user *)ioctl_ptr->ioctl_ptr, &inst_info,
+					copy_len)) {
+				return -EFAULT;
+			}
 		}
 	}
 	break;
@@ -4178,10 +4183,15 @@ static long msm_cpp_subdev_fops_compat_ioctl(struct file *file,
 				break;
 			}
 		}
-		if (copy_to_user((void __user *)kp_ioctl.ioctl_ptr,
-			&inst_info, sizeof(struct msm_cpp_frame_info32_t))) {
-			mutex_unlock(&cpp_dev->mutex);
-			return -EFAULT;
+		{
+			size_t copy_len = sizeof(struct msm_cpp_frame_info32_t);
+			if (kp_ioctl.len > 0 && kp_ioctl.len < copy_len)
+				copy_len = kp_ioctl.len;
+			if (copy_to_user((void __user *)kp_ioctl.ioctl_ptr,
+				&inst_info, copy_len)) {
+				mutex_unlock(&cpp_dev->mutex);
+				return -EFAULT;
+			}
 		}
 		cmd = VIDIOC_MSM_CPP_GET_INST_INFO;
 		break;
