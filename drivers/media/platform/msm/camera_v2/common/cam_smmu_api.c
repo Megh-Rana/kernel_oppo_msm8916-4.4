@@ -343,7 +343,7 @@ static void cam_smmu_check_vaddr_in_range(int idx, void *vaddr)
 				mapping->ion_fd);
 		}
 	}
-	if (!strcmp(iommu_cb_set.cb_info[idx].name, "vfe"))
+	if (iommu_cb_set.cb_info[idx].name && !strcmp(iommu_cb_set.cb_info[idx].name, "vfe"))
 		pr_err_ratelimited("Cannot find vaddr:%pK in SMMU.\n"
 			" %s uses invalid virtual address\n",
 			vaddr, iommu_cb_set.cb_info[idx].name);
@@ -436,7 +436,8 @@ static int cam_smmu_iommu_fault_handler(struct iommu_domain *domain,
 	cb_name = (char *)token;
 	/* check wether it is in the table */
 	for (idx = 0; idx < iommu_cb_set.cb_num; idx++) {
-		if (!strcmp(iommu_cb_set.cb_info[idx].name, cb_name))
+		if (iommu_cb_set.cb_info[idx].name &&
+		    !strcmp(iommu_cb_set.cb_info[idx].name, cb_name))
 			break;
 	}
 
@@ -594,7 +595,8 @@ static int cam_smmu_create_add_handle_in_table(char *name,
 
 	/* create handle and add in the iommu hardware table */
 	for (i = 0; i < iommu_cb_set.cb_num; i++) {
-		if (!strcmp(iommu_cb_set.cb_info[i].name, name)) {
+		if (iommu_cb_set.cb_info[i].name &&
+		    !strcmp(iommu_cb_set.cb_info[i].name, name)) {
 			mutex_lock(&iommu_cb_set.cb_info[i].lock);
 			if (iommu_cb_set.cb_info[i].handle != HANDLE_INIT) {
 				pr_err("Error: %s already got handle 0x%x\n",
@@ -2429,10 +2431,8 @@ static int cam_populate_smmu_context_banks(struct device *dev,
 	if (type == CAM_QSMMU) {
 		ctx = msm_iommu_get_ctx(cb->name);
 		if (IS_ERR_OR_NULL(ctx)) {
-			rc = ctx ? PTR_ERR(ctx) : -EPROBE_DEFER;
-			pr_err("Invalid pointer of ctx : %s rc = %d\n",
-				 cb->name, rc);
-			return rc;
+			/* On 4.4 without CONFIG_MSM_IOMMU, fall back to dev */
+			ctx = dev;
 		}
 		CDBG("getting QSMMU ctx : %s\n", cb->name);
 	} else {
@@ -2440,12 +2440,16 @@ static int cam_populate_smmu_context_banks(struct device *dev,
 		CDBG("getting Arm SMMU ctx : %s\n", cb->name);
 	}
 	rc = cam_smmu_setup_cb(cb, ctx);
-	if (rc < 0)
-		pr_err("Error: failed to setup cb : %s\n", cb->name);
+	if (rc < 0) {
+		pr_err("Error: failed to setup cb : %s rc = %d\n", cb->name, rc);
+		return rc;
+	}
 
-	iommu_set_fault_handler(cb->mapping->domain,
-			cam_smmu_iommu_fault_handler,
-			(void *)cb->name);
+	if (cb->mapping && !IS_ERR(cb->mapping) && cb->mapping->domain) {
+		iommu_set_fault_handler(cb->mapping->domain,
+				cam_smmu_iommu_fault_handler,
+				(void *)cb->name);
+	}
 
 	/* increment count to next bank */
 	iommu_cb_set.cb_init_count++;

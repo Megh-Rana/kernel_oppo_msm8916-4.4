@@ -22,12 +22,17 @@ static void ci_hdrc_msm_notify_event(struct ci_hdrc *ci, unsigned event)
 	struct device *dev = ci->gadget.dev.parent;
 
 	switch (event) {
-	case CI_HDRC_CONTROLLER_RESET_EVENT:
+	case CI_HDRC_CONTROLLER_RESET_EVENT: {
+		u32 temp;
 		dev_dbg(dev, "CI_HDRC_CONTROLLER_RESET_EVENT received\n");
 		writel(0, USB_AHBBURST);
 		writel(0x08, USB_AHBMODE);
-		usb_phy_init(ci->usb_phy);
+		/* workaround for rx buffer collision issue */
+		temp = readl(MSM_USB_BASE + 0x009C);
+		temp &= ~((1 << 4) | (1 << 5));
+		writel(temp, MSM_USB_BASE + 0x009C);
 		break;
+	}
 	case CI_HDRC_CONTROLLER_STOPPED_EVENT:
 		dev_dbg(dev, "CI_HDRC_CONTROLLER_STOPPED_EVENT received\n");
 		/*

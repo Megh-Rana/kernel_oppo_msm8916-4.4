@@ -430,4 +430,6 @@ u8 hw_port_test_get(struct ci_hdrc *ci);
 
 void ci_platform_configure(struct ci_hdrc *ci);
 
+void ci_hdrc_enter_lpm(struct ci_hdrc *ci, bool enable);
+
 #endif	/* __DRIVERS_USB_CHIPIDEA_CI_H */

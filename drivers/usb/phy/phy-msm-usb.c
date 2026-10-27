@@ -258,15 +258,6 @@ static int msm_phy_notify_disconnect(struct usb_phy *phy,
 		mb();
 	}
 
-	/*
-	 * Put the transceiver in non-driving mode. Otherwise host
-	 * may not detect soft-disconnection.
-	 */
-	val = ulpi_read(phy, ULPI_FUNC_CTRL);
-	val &= ~ULPI_FUNC_CTRL_OPMODE_MASK;
-	val |= ULPI_FUNC_CTRL_OPMODE_NONDRIVING;
-	ulpi_write(phy, val, ULPI_FUNC_CTRL);
-
 	return 0;
 }
 
@@ -292,11 +283,6 @@ static int msm_phy_notify_connect(struct usb_phy *phy,
 		writel(val, USB_USBCMD);
 		mb();
 	}
-
-	val = ulpi_read(phy, ULPI_FUNC_CTRL);
-	val &= ~ULPI_FUNC_CTRL_OPMODE_MASK;
-	val |= ULPI_FUNC_CTRL_OPMODE_NORMAL | ULPI_FUNC_CTRL_SUSPENDM;
-	ulpi_write(phy, val, ULPI_FUNC_CTRL);
 
 	return 0;
 }
@@ -474,24 +460,6 @@ static int msm_phy_init(struct usb_phy *phy)
 
 	if (pdata->otg_control == OTG_PMIC_CONTROL) {
 		ulpi_write(phy, OTG_COMP_DISABLE, ULPI_SET(ULPI_PWR_CLK_MNG_REG));
-	}
-
-	if (motg->manual_pullup) {
-		val = ULPI_MISC_A_VBUSVLDEXTSEL | ULPI_MISC_A_VBUSVLDEXT;
-		ulpi_write(phy, val, ULPI_SET(ULPI_MISC_A));
-
-		val = readl(USB_GENCONFIG_2);
-		val |= GENCONFIG_2_SESS_VLD_CTRL_EN;
-		writel(val, USB_GENCONFIG_2);
-
-		val = readl(USB_USBCMD);
-		val |= USBCMD_SESS_VLD_CTRL;
-		writel(val, USB_USBCMD);
-
-		val = ulpi_read(phy, ULPI_FUNC_CTRL);
-		val &= ~ULPI_FUNC_CTRL_OPMODE_MASK;
-		val |= ULPI_FUNC_CTRL_OPMODE_NORMAL | ULPI_FUNC_CTRL_SUSPENDM;
-		ulpi_write(phy, val, ULPI_FUNC_CTRL);
 	}
 
 	if (motg->phy_number)

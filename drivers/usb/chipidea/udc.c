@@ -1600,6 +1600,8 @@ static int ci_udc_pullup(struct usb_gadget *_gadget, int is_on)
 	pr_info("ci_udc_pullup: is_on=%d, usb_phy=%p\n", is_on, ci->usb_phy);
 
 	if (is_on) {
+		ci_hdrc_enter_lpm(ci, false);
+
 		if (ci->usb_phy)
 			usb_phy_notify_connect(ci->usb_phy, ci->gadget.speed);
 
